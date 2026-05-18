@@ -289,6 +289,33 @@ body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;m
   .vit-score{font-size:32px}
 }
 
+
+/* SURGERY LOG V2 */
+.slog-step{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.slog-step:last-of-type{border-bottom:none}
+.slog-specialty-btns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.spec-btn{padding:12px 8px;border-radius:10px;border:2px solid var(--border);background:var(--faint);color:var(--text);font-size:9px;cursor:pointer;text-align:center;transition:all .2s;font-family:'Space Mono',monospace;touch-action:manipulation;line-height:1.4}
+.spec-btn .spec-icon{font-size:18px;display:block;margin-bottom:4px}
+.spec-btn.sel{border-color:var(--surgery);background:#f0f9ff;font-weight:700}
+.slog-proc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px;max-height:220px;overflow-y:auto}
+.proc-btn{padding:9px 8px;border-radius:8px;border:1px solid var(--border);background:var(--faint);color:var(--muted);font-size:8px;cursor:pointer;text-align:left;transition:all .2s;font-family:'Space Mono',monospace;touch-action:manipulation;line-height:1.4}
+.proc-btn.sel{border-color:var(--surgery);background:#e8f7ff;color:var(--text);font-weight:700}
+.proc-btn.frequent{border-color:var(--pink2);background:#fff0f8}
+.slog-mini-btn{padding:9px 14px;background:var(--surgery);border:none;border-radius:8px;color:#fff;font-family:'Space Mono',monospace;font-size:12px;cursor:pointer;font-weight:700;touch-action:manipulation}
+.slog-role-grid{display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px}
+.role-btn{padding:10px 14px;border-radius:9px;border:2px solid var(--border);background:var(--faint);color:var(--text);font-size:9px;cursor:pointer;text-align:left;transition:all .2s;font-family:'Space Mono',monospace;touch-action:manipulation;display:flex;justify-content:space-between;align-items:center}
+.role-btn .role-score{font-size:7px;color:var(--muted);background:var(--border);padding:2px 6px;border-radius:4px}
+.role-btn.sel{border-color:var(--surgery);background:#e8f7ff;font-weight:700}
+.role-btn.sel .role-score{background:var(--surgery);color:#fff}
+.slog-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.tag-btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:var(--faint);color:var(--muted);font-size:8px;cursor:pointer;transition:all .2s;touch-action:manipulation}
+.tag-btn.sel{background:var(--lavender2);border-color:var(--lavender);color:var(--text);font-weight:700}
+.slog-summary{background:linear-gradient(135deg,#f0f9ff,#f5f0ff);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-top:4px}
+.summary-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:9px}
+.summary-row:last-child{border-bottom:none}
+.sum-lbl{color:var(--muted);letter-spacing:1px;font-size:8px}
+.sum-val{color:var(--surgery);font-weight:700}
+
 /* CHECKIN CARDS */
 .checkin-card{background:var(--s1);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 1px 8px #ff6eb408}
 .evening-card{border-color:var(--lavender2);background:linear-gradient(135deg,#fff8fb,#f8f0ff)}
@@ -441,31 +468,61 @@ body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;m
 <div class="page" id="page-surgery">
   <div class="sec-title">— Surgical Autonomy Log</div>
   <div class="surgery-log">
-    <div class="slog-row">
-      <span class="slog-lbl">ПРОЦЕДУРА / ОПЕРАЦИЯ</span>
-      <input class="slog-input" id="slog-proc" placeholder="напр. лапароскопическая холецистэктомия" autocomplete="off">
+
+    <!-- STEP 1: SPECIALTY -->
+    <div class="slog-step">
+      <span class="slog-lbl">1 · РАЗДЕЛ ХИРУРГИИ</span>
+      <div class="slog-specialty-btns" id="specialtyBtns"></div>
     </div>
-    <div class="slog-row">
-      <span class="slog-lbl">МОЯ РОЛЬ</span>
-      <input class="slog-input" id="slog-role" placeholder="наблюдала / ассистировала / выполнила этап / первый оператор" autocomplete="off">
+
+    <!-- STEP 2: PROCEDURE -->
+    <div class="slog-step" id="procedureStep" style="display:none">
+      <span class="slog-lbl">2 · ОПЕРАЦИЯ / ПРОЦЕДУРА</span>
+      <div class="slog-proc-grid" id="procGrid"></div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+        <input class="slog-input" id="slog-proc-custom" placeholder="или введи вручную..." autocomplete="off" style="flex:1">
+        <button class="slog-mini-btn" onclick="selectCustomProc()">+</button>
+      </div>
     </div>
-    <div class="slog-row">
-      <span class="slog-lbl">ЧТО УЛУЧШИЛОСЬ</span>
-      <textarea class="slog-input" id="slog-improved" rows="2" placeholder="один конкретный навык или момент"></textarea>
+
+    <!-- STEP 3: ROLE -->
+    <div class="slog-step" id="roleStep" style="display:none">
+      <span class="slog-lbl">3 · МОЯ РОЛЬ</span>
+      <div class="slog-role-grid" id="roleGrid"></div>
     </div>
-    <div class="slog-row">
-      <span class="slog-lbl">ЧТО СПРОСИТЬ В СЛЕДУЮЩИЙ РАЗ</span>
-      <input class="slog-input" id="slog-next" placeholder="один конкретный вопрос" autocomplete="off">
-    </div>
-    <div class="slog-row">
-      <span class="slog-lbl">AUTONOMY SCORE</span>
+
+    <!-- STEP 4: DETAILS -->
+    <div class="slog-step" id="detailsStep" style="display:none">
+      <span class="slog-lbl">4 · AUTONOMY SCORE</span>
       <div class="autonomy-btns" id="autonomyBtns"></div>
+      <div style="margin-top:4px;font-size:7px;color:var(--muted)">0 наблюдение · 1 пассив · 2 актив · 3 этап · 4 часть · 5 первый оп.</div>
+
+      <div style="margin-top:14px">
+        <span class="slog-lbl">ЧТО УЛУЧШИЛОСЬ</span>
+        <div class="slog-tags" id="improvedTags"></div>
+        <textarea class="slog-input" id="slog-improved" rows="2" placeholder="или напиши сам..." style="margin-top:6px"></textarea>
+      </div>
+
+      <div style="margin-top:12px">
+        <span class="slog-lbl">ЧТО СПРОСИТЬ В СЛЕДУЮЩИЙ РАЗ</span>
+        <input class="slog-input" id="slog-next" placeholder="один конкретный вопрос" autocomplete="off">
+      </div>
     </div>
-    <div class="slog-actions">
+
+    <!-- SELECTED SUMMARY -->
+    <div class="slog-summary" id="slogSummary" style="display:none">
+      <div class="summary-row"><span class="sum-lbl">РАЗДЕЛ</span><span class="sum-val" id="sum-specialty">—</span></div>
+      <div class="summary-row"><span class="sum-lbl">ОПЕРАЦИЯ</span><span class="sum-val" id="sum-proc">—</span></div>
+      <div class="summary-row"><span class="sum-lbl">РОЛЬ</span><span class="sum-val" id="sum-role">—</span></div>
+      <div class="summary-row"><span class="sum-lbl">АВТОНОМИЯ</span><span class="sum-val" id="sum-score">—</span></div>
+    </div>
+
+    <div class="slog-actions" style="margin-top:14px">
       <button class="slog-save" onclick="saveLog()">СОХРАНИТЬ +120 XP</button>
       <button class="slog-sheets" id="sheetsBtn" onclick="syncToSheets()">📊 SYNC TO SHEETS</button>
     </div>
   </div>
+
   <div class="sec-title">— История записей</div>
   <div class="slog-entries" id="slogEntries"></div>
 </div>
@@ -819,7 +876,7 @@ function switchTab(id){
 }
 
 function renderAll(){
-  renderWins(); renderMorningBtns(); renderEveningForm(); renderDailyQuests();
+  renderWins(); renderMorningBtns(); renderEveningForm(); renderDailyQuests(); renderSpecialtyBtns();
   renderWeeklyDomains(); renderAutonomyBtns(); renderSlogEntries();
   renderMoneyActions(); renderMoneyProgress(); renderMoneyLog(); renderMoneyBoss();
   renderBosses(); renderFrozen(); renderMonthSelector(); updateXPDisplay();
@@ -906,36 +963,66 @@ function toggleSQ(id,xp){
 
 // ── SURGERY LOG ──
 function renderAutonomyBtns(){
-  document.getElementById('autonomyBtns').innerHTML=AUTONOMY_LABELS.map((lbl,n)=>
-    `<button class="abtn${window.S.autonomyScore===n?' sel':''}" onclick="setAutonomy(${n})">${lbl}</button>`).join('');
+  const el = document.getElementById('autonomyBtns');
+  if (!el) return;
+  el.innerHTML=AUTONOMY_LABELS.map((lbl,n)=>
+    `<button class="abtn${slogState.autonomyScore===n?' sel':''}" onclick="setAutonomy(${n})">${lbl}</button>`).join('');
 }
-function setAutonomy(n){window.S.autonomyScore=n;save({autonomyScore:n});renderAutonomyBtns();}
+function setAutonomy(n){
+  slogState.autonomyScore=n; window.S.autonomyScore=n;
+  // sync with role selection
+  const matchRole = ROLES.find(r=>r.score===n);
+  if(matchRole){ slogState.role=matchRole.label; renderRoleGrid(); }
+  updateSummary(); renderAutonomyBtns();
+}
 function saveLog(){
-  const proc=document.getElementById('slog-proc').value.trim();
-  if(!proc){alert('Введи название процедуры');return;}
-  const entry={proc,date:new Date().toLocaleDateString('ru'),
-    role:document.getElementById('slog-role').value.trim(),
-    improved:document.getElementById('slog-improved').value.trim(),
-    next:document.getElementById('slog-next').value.trim(),
-    score:window.S.autonomyScore,ts:Date.now()};
+  if(!slogState.proc){alert('Выбери операцию');return;}
+  const tags = slogState.improvedTags.join(', ');
+  const customImproved = document.getElementById('slog-improved') ? document.getElementById('slog-improved').value.trim() : '';
+  const improved = [tags, customImproved].filter(Boolean).join(' · ');
+  const next = document.getElementById('slog-next') ? document.getElementById('slog-next').value.trim() : '';
+  const spec = SPECIALTIES.find(s => s.id === slogState.specialty);
+  const entry={
+    proc: slogState.proc,
+    specialty: spec ? spec.name : '',
+    date:new Date().toLocaleDateString('ru'),
+    role: slogState.role || '',
+    improved: improved,
+    next: next,
+    score: slogState.autonomyScore,
+    ts:Date.now()
+  };
   window.S.slogEntries.unshift(entry);
   window.S.totalXP+=120;window.S.weekXP+=120;
   if(!window.S.sqDone['wq_slog'])window.S.sqDone['wq_slog']=true;
   save({slogEntries:window.S.slogEntries,totalXP:window.S.totalXP,weekXP:window.S.weekXP,sqDone:window.S.sqDone});
-  ['slog-proc','slog-role','slog-next'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('slog-improved').value='';
-  window.S.autonomyScore=null;renderAutonomyBtns();renderSlogEntries();updateXPDisplay();
+  // reset form
+  slogState = {specialty:null,proc:null,role:null,autonomyScore:null,improvedTags:[]};
+  window.S.autonomyScore=null;
+  if(document.getElementById('slog-improved')) document.getElementById('slog-improved').value='';
+  if(document.getElementById('slog-next')) document.getElementById('slog-next').value='';
+  if(document.getElementById('slog-proc-custom')) document.getElementById('slog-proc-custom').value='';
+  document.getElementById('procedureStep').style.display='none';
+  document.getElementById('roleStep').style.display='none';
+  document.getElementById('detailsStep').style.display='none';
+  document.getElementById('slogSummary').style.display='none';
+  renderSpecialtyBtns(); renderSlogEntries(); updateXPDisplay();
 }
 function renderSlogEntries(){
   const el=document.getElementById('slogEntries');
+  if(!el)return;
   if(!window.S.slogEntries.length){el.innerHTML='<div class="note">Нет записей.</div>';return;}
   el.innerHTML=window.S.slogEntries.map(e=>`
     <div class="slog-entry">
-      <div class="entry-meta"><span class="entry-proc">${e.proc}</span><span class="entry-score">автономия ${e.score??'—'}/5</span></div>
+      <div class="entry-meta">
+        <span class="entry-proc">${e.proc}</span>
+        <span class="entry-score">автономия ${e.score??'—'}/5</span>
+      </div>
+      ${e.specialty?`<div style="font-size:7px;color:var(--sky);margin-bottom:3px">${e.specialty}</div>`:''}
       <div><b>Роль:</b> ${e.role||'—'}</div>
       <div><b>Улучшилось:</b> ${e.improved||'—'}</div>
       <div><b>Следующий вопрос:</b> ${e.next||'—'}</div>
-      <div style="font-size:7px;color:var(--muted);margin-top:3px">${e.date}</div>
+      <div style="font-size:7px;color:var(--muted);margin-top:3px">${e.date}${e.synced?' · ✓ synced':''}</div>
     </div>`).join('');
 }
 
@@ -1110,6 +1197,151 @@ function updateXPDisplay(){
   document.getElementById('todayXP').textContent=today;
   document.getElementById('weekXPDisp').textContent=Math.max(0,window.S.weekXP);
   document.getElementById('streakDisp').textContent=window.S.streak;
+}
+
+
+
+// ── SURGERY LOG DATA ──
+const SPECIALTIES = [
+  {id:'general', icon:'🔧', name:'Общая хирургия', procs:[
+    'Аппендэктомия (лапароскопия)','Аппендэктомия (открытая)','Холецистэктомия (лапароскопия)',
+    'Холецистэктомия (открытая)','Грыжесечение пахового канала','Грыжесечение пупочной грыжи',
+    'Спленэктомия','Резекция тонкой кишки','Гастростомия','Лапаротомия диагностическая',
+    'Дренирование брюшной полости','Ушивание перфорации','Резекция желудка',
+  ]},
+  {id:'purulent', icon:'🩹', name:'Гнойная хирургия', procs:[
+    'Вскрытие абсцесса','Вскрытие флегмоны','Некрэктомия','ПХО раны',
+    'Вскрытие панариция','Вскрытие паропроктита','Обработка трофической язвы',
+    'Дренирование гнойника','Иссечение свища','Ампутация пальца',
+  ]},
+  {id:'coloproct', icon:'🔵', name:'Колопроктология', procs:[
+    'Геморроидэктомия','Иссечение анальной трещины','Иссечение свища прямой кишки',
+    'Резекция сигмовидной кишки','Правосторонняя гемиколэктомия','Левосторонняя гемиколэктомия',
+    'Передняя резекция прямой кишки','Брюшно-промежностная экстирпация','Операция Гартмана',
+    'Наложение колостомы','Закрытие колостомы','Удаление полипа','Сфинктеропластика',
+  ]},
+  {id:'oncomammo', icon:'🎗', name:'Онкомаммология', procs:[
+    'Секторальная резекция молочной железы','Мастэктомия по Маддену','Мастэктомия радикальная',
+    'Онкопластическая резекция','Биопсия сторожевого лимфоузла','Лимфодиссекция подмышечная',
+    'Удаление фиброаденомы','Энуклеация кисты молочной железы','Установка порт-системы',
+    'Биопсия опухоли','Эксцизионная биопсия лимфоузла',
+  ]},
+];
+
+const ROLES = [
+  {label:'Наблюдала', score:0, desc:'только присутствовала'},
+  {label:'Ассистировала пассивно', score:1, desc:'держала крючки, подавала инструменты'},
+  {label:'Ассистировала активно', score:2, desc:'коагуляция, ушивание, клипирование'},
+  {label:'Выполнила один этап', score:3, desc:'конкретный шаг операции самостоятельно'},
+  {label:'Вела часть операции', score:4, desc:'несколько этапов под супервизией'},
+  {label:'Первый оператор', score:5, desc:'провела операцию под супервизией'},
+];
+
+const IMPROVED_TAGS = [
+  'Вязание узлов','Работа с коагулятором','Троакарная техника','Выделение структур',
+  'Скорость работы','Пространственная ориентация','Коммуникация с командой',
+  'Экономия движений','Гемостаз','Ушивание','Работа в глубине раны','Лапароскопическое мышление',
+];
+
+// Surgery log state
+let slogState = {
+  specialty: null, proc: null, role: null, autonomyScore: null,
+  improvedTags: [],
+};
+
+function renderSpecialtyBtns() {
+  const el = document.getElementById('specialtyBtns');
+  if (!el) return;
+  el.innerHTML = SPECIALTIES.map(s =>
+    `<button class="spec-btn${slogState.specialty===s.id?' sel':''}" onclick="selectSpecialty('${s.id}')">
+      <span class="spec-icon">${s.icon}</span>${s.name}
+    </button>`).join('');
+}
+
+function selectSpecialty(id) {
+  slogState.specialty = id; slogState.proc = null;
+  renderSpecialtyBtns();
+  document.getElementById('procedureStep').style.display = 'block';
+  renderProcGrid();
+  document.getElementById('roleStep').style.display = 'none';
+  document.getElementById('detailsStep').style.display = 'none';
+  updateSummary();
+}
+
+function renderProcGrid() {
+  const spec = SPECIALTIES.find(s => s.id === slogState.specialty);
+  if (!spec) return;
+  const el = document.getElementById('procGrid');
+  // Mark frequent procedures from history
+  const freq = getFrequentProcs();
+  el.innerHTML = spec.procs.map(p =>
+    `<button class="proc-btn${slogState.proc===p?' sel':''}${freq.includes(p)?' frequent':''}" onclick="selectProc('${p.replace(/'/g,"\'")}')">
+      ${freq.includes(p)?'★ ':''}${p}
+    </button>`).join('');
+}
+
+function getFrequentProcs() {
+  if (!window.S.slogEntries || !window.S.slogEntries.length) return [];
+  const counts = {};
+  window.S.slogEntries.forEach(e => { if(e.proc) counts[e.proc] = (counts[e.proc]||0)+1; });
+  return Object.entries(counts).filter(([,v])=>v>=2).map(([k])=>k);
+}
+
+function selectProc(p) {
+  slogState.proc = p;
+  renderProcGrid();
+  document.getElementById('roleStep').style.display = 'block';
+  renderRoleGrid();
+  updateSummary();
+}
+
+function selectCustomProc() {
+  const val = document.getElementById('slog-proc-custom').value.trim();
+  if (!val) return;
+  selectProc(val);
+  document.getElementById('slog-proc-custom').value = '';
+}
+
+function renderRoleGrid() {
+  const el = document.getElementById('roleGrid');
+  if (!el) return;
+  el.innerHTML = ROLES.map(r =>
+    `<button class="role-btn${slogState.role===r.label?' sel':''}" onclick="selectRole('${r.label}',${r.score})">
+      <span>${r.label} <span style="color:var(--muted);font-weight:400">— ${r.desc}</span></span>
+      <span class="role-score">${r.score}/5</span>
+    </button>`).join('');
+}
+
+function selectRole(label, score) {
+  slogState.role = label; slogState.autonomyScore = score;
+  window.S.autonomyScore = score;
+  renderRoleGrid();
+  document.getElementById('detailsStep').style.display = 'block';
+  renderAutonomyBtns(); renderImprovedTags();
+  updateSummary();
+  document.getElementById('slogSummary').style.display = 'block';
+}
+
+function renderImprovedTags() {
+  const el = document.getElementById('improvedTags');
+  if (!el) return;
+  el.innerHTML = IMPROVED_TAGS.map(t =>
+    `<button class="tag-btn${slogState.improvedTags.includes(t)?' sel':''}" onclick="toggleImprovedTag('${t}')">${t}</button>`
+  ).join('');
+}
+
+function toggleImprovedTag(t) {
+  const i = slogState.improvedTags.indexOf(t);
+  if (i>=0) slogState.improvedTags.splice(i,1); else slogState.improvedTags.push(t);
+  renderImprovedTags();
+}
+
+function updateSummary() {
+  const spec = SPECIALTIES.find(s => s.id === slogState.specialty);
+  document.getElementById('sum-specialty').textContent = spec ? spec.name : '—';
+  document.getElementById('sum-proc').textContent = slogState.proc || '—';
+  document.getElementById('sum-role').textContent = slogState.role || '—';
+  document.getElementById('sum-score').textContent = slogState.autonomyScore !== null ? slogState.autonomyScore+'/5' : '—';
 }
 
 
