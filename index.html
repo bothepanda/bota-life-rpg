@@ -672,7 +672,7 @@ window.saveToFirebase = function() {}; // placeholder until module loads
 </script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, onValue, set, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, onValue, get, set, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbywbdkhr_IQSwX1dh31-s2lUg-Rw_hwqLqeRAlsTYBBXch0HuxrrzYrQaofBf2b1vzp/exec';
 
@@ -701,17 +701,30 @@ window.setSyncStatus = function(status, label) {
 // ── STATE ── (defaults defined in inline script above)
 let dbReady = false;
 
-// Load from Firebase
+// Load from Firebase — one-time read, no realtime listener loop
 setSyncStatus('syncing', 'Загрузка...');
-onValue(ref(db, ROOT), (snapshot) => {
+get(ref(db, ROOT)).then((snapshot) => {
   const data = snapshot.val();
   if (data) Object.assign(window.S, data);
   dbReady = true;
 
-  setSyncStatus('connected', 'Синхронизировано');
-  document.getElementById('syncUser').textContent = 'bota@firebase';
+  // Day reset: if lastStreakDay != today, clear daily state
+  const todayStr = new Date().toDateString();
+  if (window.S.lastStreakDay && window.S.lastStreakDay !== todayStr) {
+    window.S.todayLogged = false;
+    window.S.dailyDone = {};
+    window.S.morningScore = null;
+    window.S.todayMood = null;
+    window.S.vitality = null;
+    update(ref(db, ROOT), {
+      todayLogged: false, dailyDone: {}, morningScore: null, todayMood: null, vitality: null
+    });
+  }
+
+  setSyncStatus('connected', 'Синхронизировано ✓');
+  document.getElementById('syncUser').textContent = 'bota · synced';
   renderAll();
-}, (err) => {
+}).catch((err) => {
   setSyncStatus('error', 'Ошибка соединения');
   renderAll();
 });
@@ -950,17 +963,6 @@ window.getDayState = function() {
   const key = window.getDateKey(window.viewDate);
   const todayKey = getTodayKey();
   if (key === todayKey) {
-    // Check if lastStreakDay is from a previous day — if so, reset today's state
-    const last = window.S.lastStreakDay;
-    if (last && last !== new Date().toDateString()) {
-      window.S.todayLogged = false;
-      window.S.dailyDone = {};
-      window.S.morningScore = null;
-      window.S.todayMood = null;
-      if(window.saveToFirebase) window.saveToFirebase({
-        todayLogged: false, dailyDone: {}, morningScore: null, todayMood: null
-      });
-    }
     return {
       dailyDone: window.S.dailyDone || {},
       morningScore: window.S.morningScore,
