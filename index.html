@@ -290,6 +290,17 @@ body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;m
 }
 
 
+
+/* DATE NAVIGATION */
+.date-nav{display:flex;align-items:center;gap:12px;background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:14px 18px;margin-bottom:14px;box-shadow:0 1px 6px #ff6eb408}
+.date-arrow{width:36px;height:36px;border-radius:10px;border:1px solid var(--border);background:var(--faint);color:var(--text);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;flex-shrink:0;transition:all .2s}
+.date-arrow:hover{border-color:var(--pink);color:var(--pink)}
+.date-arrow:disabled{opacity:.3;pointer-events:none}
+.date-center{flex:1;text-align:center}
+.date-display{font-family:'Unbounded',sans-serif;font-size:14px;font-weight:700;color:var(--text)}
+.date-sub{font-size:9px;color:var(--muted);margin-top:3px;letter-spacing:1px}
+.date-past-note{font-size:9px;color:var(--lavender);text-align:center;padding:8px;background:#f8f0ff;border-radius:8px;margin-bottom:10px;display:none}
+
 /* SURGERY LOG V2 */
 .slog-step{margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)}
 .slog-step:last-of-type{border-bottom:none}
@@ -394,6 +405,16 @@ body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;m
   <div class="wins" id="winsGrid"></div>
   <div class="divider"></div>
 
+  <!-- DATE SELECTOR -->
+  <div class="date-nav">
+    <button class="date-arrow" onclick="shiftDay(-1)">‹</button>
+    <div class="date-center">
+      <div class="date-display" id="dateDisplay"></div>
+      <div class="date-sub" id="dateSub"></div>
+    </div>
+    <button class="date-arrow" onclick="shiftDay(1)" id="nextDayBtn">›</button>
+  </div>
+
   <!-- MORNING CHECK-IN -->
   <div class="checkin-card" id="morningCard">
     <div class="checkin-header">
@@ -456,6 +477,7 @@ body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;m
     </div>
   </div>
 </div>
+
 
 <!-- WEEKLY -->
 <div class="page" id="page-weekly">
@@ -681,22 +703,6 @@ onValue(ref(db, ROOT), (snapshot) => {
   if (data) Object.assign(window.S, data);
   dbReady = true;
 
-  // DAY RESET — runs immediately after Firebase data loads
-  const today = new Date().toDateString();
-  const lastDay = window.S.lastStreakDay;
-  if (lastDay && lastDay !== today) {
-    window.S.todayLogged = false;
-    window.S.dailyDone = {};
-    window.S.morningScore = null;
-    window.S.todayMood = null;
-    update(ref(db, ROOT), {
-      todayLogged: false,
-      dailyDone: {},
-      morningScore: null,
-      todayMood: null,
-    });
-  }
-
   setSyncStatus('connected', 'Синхронизировано');
   document.getElementById('syncUser').textContent = 'bota@firebase';
   renderAll();
@@ -892,27 +898,178 @@ function switchTab(id){
   if(id==='monthly') renderMonthly();
 }
 
-function checkDayReset(){
-  const today = new Date().toDateString();
-  const lastDay = window.S.lastStreakDay;
-  // If lastStreakDay is not today — it's a new day, reset daily state
-  if (lastDay && lastDay !== today) {
-    window.S.todayLogged = false;
-    window.S.dailyDone = {};
-    window.S.morningScore = null;
-    window.S.todayMood = null;
-    // Don't reset weekXP or sqDone — those are weekly
-    save({todayLogged:false, dailyDone:{}, morningScore:null, todayMood:null});
+
+// ── DATE NAVIGATION ──
+let viewDate = new Date();
+viewDate.setHours(0,0,0,0);
+
+function getDateKey(d) {
+  return d.toISOString().slice(0,10); // YYYY-MM-DD
+}
+
+function getTodayKey() {
+  const t = new Date(); t.setHours(0,0,0,0);
+  return getDateKey(t);
+}
+
+function isToday() {
+  return getDateKey(viewDate) === getTodayKey();
+}
+
+function shiftDay(delta) {
+  const newDate = new Date(viewDate);
+  newDate.setDate(newDate.getDate() + delta);
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (newDate > today) return; // can't go to future
+  viewDate = newDate;
+  renderDateNav();
+  renderDayData();
+}
+
+function renderDateNav() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const isT = isToday();
+  const dayNames = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+  const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const el = document.getElementById('dateDisplay');
+  const sub = document.getElementById('dateSub');
+  const nextBtn = document.getElementById('nextDayBtn');
+  if (!el) return;
+  el.textContent = isT ? 'Сегодня' : `${viewDate.getDate()} ${months[viewDate.getMonth()]}`;
+  sub.textContent = isT ? `${viewDate.getDate()} ${months[viewDate.getMonth()]} · ${dayNames[viewDate.getDay()]}` : dayNames[viewDate.getDay()];
+  if (nextBtn) nextBtn.disabled = isT;
+}
+
+function getDayState() {
+  // Returns state object for viewDate
+  const key = getDateKey(viewDate);
+  const todayKey = getTodayKey();
+  if (key === todayKey) {
+    // Today — use live S state
+    return {
+      dailyDone: window.S.dailyDone || {},
+      morningScore: window.S.morningScore,
+      todayLogged: window.S.todayLogged,
+      vitality: window.S.vitality,
+      todayMood: window.S.todayMood,
+      isPast: false,
+    };
+  }
+  // Past day — look up in dayLog
+  const log = (window.S.dayLog || []).find(e => {
+    const d = new Date(e.ts); d.setHours(0,0,0,0);
+    return getDateKey(d) === key;
+  });
+  return {
+    dailyDone: log ? (log.dailyDone || {}) : {},
+    morningScore: log ? log.morning : null,
+    todayLogged: !!log,
+    vitality: log ? log.vitality : null,
+    todayMood: log ? log.mood : null,
+    isPast: true,
+    log,
+  };
+}
+
+function renderDayData() {
+  renderDateNav();
+  const state = getDayState();
+  const isPast = state.isPast;
+
+  // Morning card
+  renderMorningBtnsForState(state.morningScore, isPast);
+  if (state.morningScore) showRecommendation(state.morningScore);
+
+  // Daily quests
+  renderDailyQuestsForState(state.dailyDone, isPast);
+
+  // Evening form
+  renderEveningFormForState(state, isPast);
+
+  // XP
+  const todayXP = DAILY_QUESTS.filter(q => state.dailyDone[q.id]).reduce((s,q)=>s+q.xp,0);
+  document.getElementById('todayXP').textContent = todayXP;
+  document.getElementById('weekXPDisp').textContent = Math.max(0, window.S.weekXP || 0);
+  document.getElementById('streakDisp').textContent = window.S.streak || 0;
+}
+
+function renderMorningBtnsForState(score, isPast) {
+  const el = document.getElementById('morningBtns');
+  if (!el) return;
+  const badge = document.getElementById('morningDoneBadge');
+  el.innerHTML = MORNING_OPTS.map(o =>
+    `<button class="mbtn${score===o.v?' sel':''}" onclick="${isPast?'':'setMorning('+o.v+')'}" ${isPast?'disabled':''}>
+      ${o.emoji}<span class="mbtn-lbl">${o.lbl}</span>
+    </button>`).join('');
+  if (badge) badge.style.display = score ? 'flex' : 'none';
+}
+
+function renderDailyQuestsForState(dailyDone, isPast) {
+  const el = document.getElementById('dailyList');
+  if (!el) return;
+  el.innerHTML = DAILY_QUESTS.map(q => {
+    const done = !!dailyDone[q.id];
+    return `<div class="dq${done?' done':''}${isPast?' locked':''}" style="--qc:${q.color}" ${isPast?'':'onclick="toggleDaily(''+q.id+'','+q.xp+')"'}>
+      <div class="dq-check">${done?'✓':''}</div>
+      <div><div class="dq-name">${q.name}</div><div class="dq-meta">${q.meta}</div></div>
+      <div class="dq-xp">+${q.xp}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderEveningFormForState(state, isPast) {
+  const hint = document.getElementById('eveningUnlockHint');
+  const form = document.getElementById('eveningForm');
+  const badge = document.getElementById('eveningDoneBadge');
+  const shield = document.getElementById('streakShield');
+
+  if (isPast) {
+    if (hint) hint.style.display = 'none';
+    if (shield) shield.style.display = 'none';
+    if (state.todayLogged && state.log) {
+      if (form) form.style.display = 'none';
+      if (badge) badge.style.display = 'flex';
+    } else {
+      if (form) form.style.display = 'none';
+      if (badge) badge.style.display = 'none';
+      if (hint) { hint.textContent = 'День не залогирован'; hint.style.display = 'block'; }
+    }
+    return;
+  }
+
+  // Today logic
+  if (badge) badge.style.display = state.todayLogged ? 'flex' : 'none';
+  if (state.todayLogged) {
+    if (form) form.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+    return;
+  }
+  const anyDone = Object.values(state.dailyDone).some(Boolean);
+  const mode = getMorningMode();
+  const isProtected = mode === 'survival' || mode === 'recovery';
+  if (isProtected && shield) shield.style.display = 'flex';
+  if (anyDone || isProtected) {
+    if (hint) hint.textContent = '';
+    if (form) form.style.display = 'block';
+    // render vit btns and mood
+    const vb = document.getElementById('vitBtns');
+    if (vb) vb.innerHTML = [0,1,2,3,4,5].map(n =>
+      `<button class="vbtn${window.S.vitality===n?' sel':''}" onclick="setVitality(${n})">${n}</button>`).join('');
+    const mb = document.getElementById('moodBtns');
+    if (mb) mb.innerHTML = MOODS.map((m,i) =>
+      `<button class="mood-btn${window.S.todayMood===i?' sel':''}" onclick="setMood(${i})">${m}</button>`).join('');
+  } else {
+    if (hint) { hint.textContent = 'Выполни хотя бы 1 квест чтобы разблокировать'; hint.style.display = 'block'; }
   }
 }
 
 function renderAll(){
-  checkDayReset();
-  renderWins(); renderMorningBtns(); renderEveningForm(); renderDailyQuests(); renderSpecialtyBtns();
+  renderWins(); renderSpecialtyBtns();
   renderWeeklyDomains(); renderAutonomyBtns(); renderSlogEntries();
   renderMoneyActions(); renderMoneyProgress(); renderMoneyLog(); renderMoneyBoss();
   renderBosses(); renderFrozen(); renderMonthSelector(); updateXPDisplay();
   document.getElementById('daysLeft').textContent = daysLeft();
+  renderDayData(); // date-aware TODAY render
 }
 
 // ── WIN CONDITIONS ──
@@ -957,11 +1114,12 @@ function renderDailyQuests(){
   }).join('');
 }
 function toggleDaily(id,xp){
+  if (!isToday()) return; // can't edit past days
   const was=!!window.S.dailyDone[id];
   window.S.dailyDone[id]=!was;
   window.S.totalXP+=was?-xp:xp; window.S.weekXP+=was?-xp:xp;
   save({dailyDone:window.S.dailyDone,totalXP:window.S.totalXP,weekXP:window.S.weekXP});
-  renderDailyQuests(); updateXPDisplay();
+  renderDayData(); updateXPDisplay();
 }
 
 // ── WEEKLY ──
@@ -1484,10 +1642,9 @@ function logDay(){
   window.S.todayLogged=true;
   // save day entry
   if(!window.S.dayLog)window.S.dayLog=[];
-  window.S.dayLog.unshift({date:today,vitality:window.S.vitality,mood:window.S.todayMood,note,morning:window.S.morningScore});
+  window.S.dayLog.unshift({date:today,ts:Date.now(),vitality:window.S.vitality,mood:window.S.todayMood,note,morning:window.S.morningScore,dailyDone:{...window.S.dailyDone}});
   save({streak:window.S.streak,lastStreakDay:window.S.lastStreakDay,totalXP:window.S.totalXP,weekXP:window.S.weekXP,todayLogged:true,dayLog:window.S.dayLog,vitality:window.S.vitality});
-  document.getElementById('eveningForm').style.display='none';
-  document.getElementById('eveningDoneBadge').style.display='flex';
+  renderDayData();
   updateXPDisplay();
 }
 function getMorningMode(){
