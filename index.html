@@ -759,6 +759,12 @@ async function loadAll() {
     console.error(e);
   }
   renderAll();
+  // After renderAll, load today's day data and render it
+  const tk = todayKey();
+  window.getDayData(tk).then(data => {
+    window.DAYS[tk] = data;
+    if(window.renderTodayContent) window.renderTodayContent(tk, data);
+  });
 }
 
 loadAll();
