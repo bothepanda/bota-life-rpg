@@ -655,6 +655,21 @@ body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;m
 </div>
 
 <!-- FIREBASE SDK -->
+<script>
+// Default state — overwritten by Firebase after load
+window.S = {
+  vitality: null, dailyDone: {}, sqDone: {},
+  tempScore: null, tempHistory: [],
+  moneyAction: null, moneyLog: [], moneyCurrent: 0, moneyBossDone: {},
+  autonomyScore: null, slogEntries: [],
+  totalXP: 0, weekXP: 0, streak: 0,
+  kcDone: {}, srVitality: null,
+  monthlySnapshots: {}, dayLog: [],
+  todayLogged: false, morningScore: null, todayMood: null,
+  lastStreakDay: null,
+};
+window.saveToFirebase = function() {}; // placeholder until module loads
+</script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, onValue, set, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
@@ -676,24 +691,14 @@ const db = getDatabase(app);
 const ROOT = 'bota_rpg';
 
 // ── SYNC STATUS ──
-function setSyncStatus(status, label) {
+window.setSyncStatus = function(status, label) {
   const dot = document.getElementById('syncDot');
   const lbl = document.getElementById('syncLabel');
   dot.className = 'sync-dot ' + status;
   lbl.textContent = label;
 }
 
-// ── STATE ──
-window.S = {
-  vitality: null, dailyDone: {}, sqDone: {},
-  tempScore: null, tempHistory: [],
-  moneyAction: null, moneyLog: [], moneyCurrent: 0, moneyBossDone: {},
-  autonomyScore: null, slogEntries: [],
-  totalXP: 0, weekXP: 0, streak: 0,
-  kcDone: {}, srVitality: null,
-  monthlySnapshots: {},
-};
-
+// ── STATE ── (defaults defined in inline script above)
 let dbReady = false;
 
 // Load from Firebase
@@ -755,7 +760,7 @@ window.syncToSheets = async function() {
   setTimeout(() => { btn.textContent = '📊 SYNC TO SHEETS'; btn.className = 'slog-sheets'; }, 3000);
 };
 
-function sendToSheets(entry) {
+window.sendToSheets = function(entry) {
   return new Promise((resolve, reject) => {
     // Create hidden form and submit via iframe to bypass CORS
     const iframe = document.createElement('iframe');
@@ -881,15 +886,15 @@ const INFLUENCE_SUBS = [
 const MONTHS = ['Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
 // ── HELPERS ──
-function getMode(v){if(v===null)return'normal';if(v<=1)return'survival';if(v===2)return'recovery';if(v===3)return'lowbat';return'normal';}
-function daysLeft(){const d=new Date('2026-12-31');const n=new Date();return Math.max(0,Math.ceil((d-n)/86400000));}
+window.getMode = function(v){if(v===null)return'normal';if(v<=1)return'survival';if(v===2)return'recovery';if(v===3)return'lowbat';return'normal';}
+window.daysLeft = function(){const d=new Date('2026-12-31');const n=new Date();return Math.max(0,Math.ceil((d-n)/86400000));}
 
-function save(partial){
+window.save = function(partial){
   if(window.saveToFirebase) window.saveToFirebase(partial || window.S);
 }
 
 // ── TAB SWITCH ──
-function switchTab(id){
+window.switchTab = function(id){
   const ids=['today','weekly','surgery','money','sunday','monthly','bosses','frozen'];
   document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -900,33 +905,33 @@ function switchTab(id){
 
 
 // ── DATE NAVIGATION ──
-let viewDate = new Date();
-viewDate.setHours(0,0,0,0);
+window.viewDate = new Date();
+window.viewDate.setHours(0,0,0,0);
 
-function getDateKey(d) {
+window.getDateKey = function(d) {
   return d.toISOString().slice(0,10); // YYYY-MM-DD
 }
 
-function getTodayKey() {
+window.getTodayKey = function() {
   const t = new Date(); t.setHours(0,0,0,0);
   return getDateKey(t);
 }
 
-function isToday() {
-  return getDateKey(viewDate) === getTodayKey();
+window.isToday = function() {
+  return window.getDateKey(window.viewDate) === getTodayKey();
 }
 
-function shiftDay(delta) {
-  const newDate = new Date(viewDate);
+window.shiftDay = function(delta) {
+  const newDate = new Date(window.viewDate);
   newDate.setDate(newDate.getDate() + delta);
   const today = new Date(); today.setHours(0,0,0,0);
-  if (newDate > today) return; // can't go to future
-  viewDate = newDate;
+  if (newDate > today) return;
+  window.viewDate = newDate;
   renderDateNav();
   renderDayData();
 }
 
-function renderDateNav() {
+window.renderDateNav = function() {
   const today = new Date(); today.setHours(0,0,0,0);
   const isT = isToday();
   const dayNames = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
@@ -935,14 +940,14 @@ function renderDateNav() {
   const sub = document.getElementById('dateSub');
   const nextBtn = document.getElementById('nextDayBtn');
   if (!el) return;
-  el.textContent = isT ? 'Сегодня' : `${viewDate.getDate()} ${months[viewDate.getMonth()]}`;
-  sub.textContent = isT ? `${viewDate.getDate()} ${months[viewDate.getMonth()]} · ${dayNames[viewDate.getDay()]}` : dayNames[viewDate.getDay()];
+  el.textContent = isT ? 'Сегодня' : `${window.viewDate.getDate()} ${months[window.viewDate.getMonth()]}`;
+  sub.textContent = isT ? `${window.viewDate.getDate()} ${months[window.viewDate.getMonth()]} · ${dayNames[viewDate.getDay()]}` : dayNames[viewDate.getDay()];
   if (nextBtn) nextBtn.disabled = isT;
 }
 
-function getDayState() {
+window.getDayState = function() {
   // Returns state object for viewDate
-  const key = getDateKey(viewDate);
+  const key = window.getDateKey(window.viewDate);
   const todayKey = getTodayKey();
   if (key === todayKey) {
     // Today — use live S state
@@ -958,7 +963,7 @@ function getDayState() {
   // Past day — look up in dayLog
   const log = (window.S.dayLog || []).find(e => {
     const d = new Date(e.ts); d.setHours(0,0,0,0);
-    return getDateKey(d) === key;
+    return window.getDateKey(d) === key;
   });
   return {
     dailyDone: log ? (log.dailyDone || {}) : {},
@@ -971,13 +976,13 @@ function getDayState() {
   };
 }
 
-function renderDayData() {
+window.renderDayData = function() {
   renderDateNav();
   const state = getDayState();
   const isPast = state.isPast;
 
   // Morning card
-  renderMorningBtnsForState(state.morningScore, isPast);
+  window.renderMorningBtnsForState && window.renderMorningBtnsForState(state.morningScore, isPast);
   if (state.morningScore) showRecommendation(state.morningScore);
 
   // Daily quests
@@ -993,7 +998,7 @@ function renderDayData() {
   document.getElementById('streakDisp').textContent = window.S.streak || 0;
 }
 
-function renderMorningBtnsForState(score, isPast) {
+window.renderMorningBtnsForState = function(score, isPast) {
   const el = document.getElementById('morningBtns');
   if (!el) return;
   const badge = document.getElementById('morningDoneBadge');
@@ -1004,12 +1009,13 @@ function renderMorningBtnsForState(score, isPast) {
   if (badge) badge.style.display = score ? 'flex' : 'none';
 }
 
-function renderDailyQuestsForState(dailyDone, isPast) {
+window.renderDailyQuestsForState = function(dailyDone, isPast) {
   const el = document.getElementById('dailyList');
   if (!el) return;
   el.innerHTML = DAILY_QUESTS.map(q => {
     const done = !!dailyDone[q.id];
-    return `<div class="dq${done?' done':''}${isPast?' locked':''}" style="--qc:${q.color}" ${isPast?'':'onclick="toggleDaily(''+q.id+'','+q.xp+')"'}>
+    const clickAttr = isPast ? '' : `onclick="toggleDaily('${q.id}',${q.xp})"`;
+    return `<div class="dq${done?' done':''}${isPast?' locked':''}" style="--qc:${q.color}" ${clickAttr}>
       <div class="dq-check">${done?'✓':''}</div>
       <div><div class="dq-name">${q.name}</div><div class="dq-meta">${q.meta}</div></div>
       <div class="dq-xp">+${q.xp}</div>
@@ -1017,7 +1023,7 @@ function renderDailyQuestsForState(dailyDone, isPast) {
   }).join('');
 }
 
-function renderEveningFormForState(state, isPast) {
+window.renderEveningFormForState = function(state, isPast) {
   const hint = document.getElementById('eveningUnlockHint');
   const form = document.getElementById('eveningForm');
   const badge = document.getElementById('eveningDoneBadge');
@@ -1063,17 +1069,17 @@ function renderEveningFormForState(state, isPast) {
   }
 }
 
-function renderAll(){
+window.renderAll = function(){
   renderWins(); renderSpecialtyBtns();
   renderWeeklyDomains(); renderAutonomyBtns(); renderSlogEntries();
   renderMoneyActions(); renderMoneyProgress(); renderMoneyLog(); renderMoneyBoss();
   renderBosses(); renderFrozen(); renderMonthSelector(); updateXPDisplay();
   document.getElementById('daysLeft').textContent = daysLeft();
-  renderDayData(); // date-aware TODAY render
+  if(window.renderDayData) window.renderDayData();
 }
 
 // ── WIN CONDITIONS ──
-function renderWins(){
+window.renderWins = function(){
   document.getElementById('winsGrid').innerHTML = WIN_CONDITIONS.map(w=>`
     <div class="win-card" style="--wc:${w.color}">
       <div class="win-icon">${w.icon}</div>
@@ -1083,19 +1089,19 @@ function renderWins(){
 }
 
 // ── VITALITY ──
-function renderVitality(){
+window.renderVitality = function(){
   document.getElementById('vitBtns').innerHTML=[0,1,2,3,4,5].map(n=>`<button class="vbtn${window.S.vitality===n?' sel':''}" onclick="setVitality(${n})">${n}</button>`).join('');
   if(window.S.vitality!==null) document.getElementById('vitScore').textContent=window.S.vitality;
   updateModeDisplay();
 }
-function setVitality(n){
+window.setVitality = function(n){
   window.S.vitality=n;
   document.getElementById('vitScore').textContent=n;
   document.querySelectorAll('#vitBtns .vbtn').forEach((b,i)=>b.classList.toggle('sel',i===n));
   updateModeDisplay(); renderDailyQuests();
   save({vitality:n});
 }
-function updateModeDisplay(){
+window.updateModeDisplay = function(){
   const mode=getMode(window.S.vitality);const m=MODES[mode];
   document.getElementById('modeBadge').innerHTML=`<span class="mode-badge ${m.cls}">${m.label} · ЗАВТРА</span>`;
   document.getElementById('modeDesc').textContent=m.desc;
@@ -1103,7 +1109,7 @@ function updateModeDisplay(){
 }
 
 // ── DAILY QUESTS ──
-function renderDailyQuests(){
+window.renderDailyQuests = function(){
   const mode=getMode(window.S.vitality);
   document.getElementById('dailyList').innerHTML=DAILY_QUESTS.map(q=>{
     const done=!!window.S.dailyDone[q.id];const avail=true;
@@ -1113,7 +1119,7 @@ function renderDailyQuests(){
       <div class="dq-xp">+${q.xp}</div></div>`;
   }).join('');
 }
-function toggleDaily(id,xp){
+window.toggleDaily = function(id,xp){
   if (!isToday()) return; // can't edit past days
   const was=!!window.S.dailyDone[id];
   window.S.dailyDone[id]=!was;
@@ -1123,9 +1129,9 @@ function toggleDaily(id,xp){
 }
 
 // ── WEEKLY ──
-function renderWeeklyDomains(){
+window.renderWeeklyDomains = function(){
   document.getElementById('weeklyDomains').innerHTML=WEEKLY_DOMAINS.map(d=>{
-    const doneCount=d.quests.filter(q=>window.S.sqDone[q.id]).length;
+    const doneCount=d.quests.filter(q=>(window.S.sqDone||{})[q.id]).length;
     const pct=Math.round(doneCount/d.quests.length*100);
     const achieved=doneCount>=d.threshold;
     return`<div class="domain-week">
@@ -1137,14 +1143,15 @@ function renderWeeklyDomains(){
         </div>
       </div>
       <div class="side-quests">${d.quests.map(q=>{
-        const done=!!window.S.sqDone[q.id];
+        const done=!!(window.S.sqDone||{})[q.id];
         return`<div class="sq${done?' done':''}" style="--sqc:${d.color}" onclick="toggleSQ('${q.id}',${q.xp})">
           <div class="sq-check" style="border-color:${d.color}">${done?'✓':''}</div>
           <span class="sq-text">${q.text}</span><span class="sq-xp">+${q.xp}</span></div>`;
       }).join('')}</div></div>`;
   }).join('');
 }
-function toggleSQ(id,xp){
+window.toggleSQ = function(id,xp){
+  if(!window.S.sqDone)window.S.sqDone={};
   const was=!!window.S.sqDone[id];window.S.sqDone[id]=!was;
   window.S.totalXP+=was?-xp:xp;window.S.weekXP+=was?-xp:xp;
   save({sqDone:window.S.sqDone,totalXP:window.S.totalXP,weekXP:window.S.weekXP});
@@ -1152,20 +1159,20 @@ function toggleSQ(id,xp){
 }
 
 // ── SURGERY LOG ──
-function renderAutonomyBtns(){
+window.renderAutonomyBtns = function(){
   const el = document.getElementById('autonomyBtns');
   if (!el) return;
   el.innerHTML=AUTONOMY_LABELS.map((lbl,n)=>
     `<button class="abtn${slogState.autonomyScore===n?' sel':''}" onclick="setAutonomy(${n})">${lbl}</button>`).join('');
 }
-function setAutonomy(n){
+window.setAutonomy = function(n){
   slogState.autonomyScore=n; window.S.autonomyScore=n;
   // sync with role selection
   const matchRole = ROLES.find(r=>r.score===n);
   if(matchRole){ slogState.role=matchRole.label; renderRoleGrid(); }
   updateSummary(); renderAutonomyBtns();
 }
-function saveLog(){
+window.saveLog = function(){
   if(!slogState.proc){alert('Выбери операцию');return;}
   const tags = slogState.improvedTags.join(', ');
   const customImproved = document.getElementById('slog-improved') ? document.getElementById('slog-improved').value.trim() : '';
@@ -1198,11 +1205,11 @@ function saveLog(){
   document.getElementById('slogSummary').style.display='none';
   renderSpecialtyBtns(); renderSlogEntries(); updateXPDisplay();
 }
-function renderSlogEntries(){
+window.renderSlogEntries = function(){
   const el=document.getElementById('slogEntries');
   if(!el)return;
-  if(!window.S.slogEntries.length){el.innerHTML='<div class="note">Нет записей.</div>';return;}
-  el.innerHTML=window.S.slogEntries.map(e=>`
+  if(!(window.S.slogEntries||[]).length){el.innerHTML='<div class="note">Нет записей.</div>';return;}
+  el.innerHTML=(window.S.slogEntries||[]).map(e=>`
     <div class="slog-entry">
       <div class="entry-meta">
         <span class="entry-proc">${e.proc}</span>
@@ -1217,48 +1224,48 @@ function renderSlogEntries(){
 }
 
 // ── MONEY ──
-function renderMoneyActions(){
+window.renderMoneyActions = function(){
   document.getElementById('moneyActions').innerHTML=MONEY_ACTIONS.map(a=>
     `<div class="action-btn${window.S.moneyAction===a?' sel':''}" onclick="selectMoneyAction('${a}')">${a}</div>`).join('');
 }
-function selectMoneyAction(a){window.S.moneyAction=a;save({moneyAction:a});renderMoneyActions();}
-function logMoneyAction(){
+window.selectMoneyAction = function(a){window.S.moneyAction=a;save({moneyAction:a});renderMoneyActions();}
+window.logMoneyAction = function(){
   if(!window.S.moneyAction){alert('Выбери тип действия');return;}
   window.S.moneyLog.unshift({type:window.S.moneyAction,date:new Date().toLocaleDateString('ru')});
   window.S.totalXP+=160;window.S.weekXP+=160;
   save({moneyLog:window.S.moneyLog,totalXP:window.S.totalXP,weekXP:window.S.weekXP});
   window.S.moneyAction=null;renderMoneyActions();renderMoneyLog();updateXPDisplay();
 }
-function setMoneyProgress(){
+window.setMoneyProgress = function(){
   const v=parseInt(document.getElementById('moneyInput').value)||0;
   window.S.moneyCurrent=v;save({moneyCurrent:v});renderMoneyProgress();
 }
-function renderMoneyProgress(){
+window.renderMoneyProgress = function(){
   const pct=Math.min(100,Math.round(window.S.moneyCurrent/200000*100));
   document.getElementById('moneyBar').style.width=pct+'%';
   document.getElementById('moneyLbl').textContent=(window.S.moneyCurrent||0).toLocaleString('ru')+' KZT/мес';
 }
-function renderMoneyLog(){
+window.renderMoneyLog = function(){
   const el=document.getElementById('moneyLogEntries');
-  if(!window.S.moneyLog.length){el.innerHTML='<div class="note">Нет записей.</div>';return;}
-  el.innerHTML=window.S.moneyLog.slice(0,10).map(e=>`<div class="money-entry"><span class="me-type">${e.type}</span><span class="me-date">${e.date}</span></div>`).join('');
+  if(!(window.S.moneyLog||[]).length){el.innerHTML='<div class="note">Нет записей.</div>';return;}
+  el.innerHTML=(window.S.moneyLog||[]).slice(0,10).map(e=>`<div class="money-entry"><span class="me-type">${e.type}</span><span class="me-date">${e.date}</span></div>`).join('');
 }
-function renderMoneyBoss(){
+window.renderMoneyBoss = function(){
   const conds=['4 money-действия выполнены в этом месяце','1 конкретный оффер / заявка / сообщение отправлено'];
   document.getElementById('moneyBossConditions').innerHTML=conds.map((c,i)=>`
     <div class="bc${window.S.moneyBossDone[i]?' done':''}" onclick="toggleMoneyBoss(${i})">
       <div class="bc-box">${window.S.moneyBossDone[i]?'✓':''}</div><span class="bc-txt">${c}</span></div>`).join('');
-  const done=Object.values(window.S.moneyBossDone).filter(Boolean).length;
+  const done=Object.values(window.S.moneyBossDone||{}).filter(Boolean).length;
   document.getElementById('moneyBossHP').style.width=(100-done*50)+'%';
 }
-function toggleMoneyBoss(i){window.S.moneyBossDone[i]=!window.S.moneyBossDone[i];save({moneyBossDone:window.S.moneyBossDone});renderMoneyBoss();}
+window.toggleMoneyBoss = function(i){window.S.moneyBossDone[i]=!window.S.moneyBossDone[i];save({moneyBossDone:window.S.moneyBossDone});renderMoneyBoss();}
 
 // ── SUNDAY REVIEW ──
-function renderSundayReview(){
+window.renderSundayReview = function(){
   document.getElementById('sr-weekXP').textContent=window.S.weekXP;
-  const dc=Object.values(window.S.dailyDone).filter(Boolean).length;
+  const dc=Object.values(window.S.dailyDone||{}).filter(Boolean).length;
   document.getElementById('sr-dailyDone').textContent=dc+'/'+DAILY_QUESTS.length;
-  const ww=WEEKLY_DOMAINS.filter(d=>d.quests.filter(q=>window.S.sqDone[q.id]).length>=d.threshold).length;
+  const ww=WEEKLY_DOMAINS.filter(d=>d.quests.filter(q=>(window.S.sqDone||{})[q.id]).length>=d.threshold).length;
   document.getElementById('sr-weeklyWins').textContent=ww+'/'+WEEKLY_DOMAINS.length;
   document.getElementById('sr-domainWins').innerHTML=WEEKLY_DOMAINS.map(d=>{
     const done=d.quests.filter(q=>window.S.sqDone[q.id]).length;const win=done>=d.threshold;
@@ -1268,19 +1275,19 @@ function renderSundayReview(){
   tb.innerHTML=[0,1,2,3,4,5].map(n=>`<button class="tbtn${window.S.tempScore===n?' sel':''}" onclick="setTemp(${n})">${n}</button>`).join('');
   document.getElementById('tempDesc').textContent=window.S.tempScore!==null?TEMP_DESCS[window.S.tempScore]:'Выбери температуру недели';
   const hist=document.getElementById('tempHistory');
-  hist.innerHTML=window.S.tempHistory.slice(-8).map(v=>`<div class="th-bar" style="height:${Math.max(7,v/5*48)}px;flex:1" title="${v}/5"></div>`).join('');
+  hist.innerHTML=(window.S.tempHistory||[]).slice(-8).map(v=>`<div class="th-bar" style="height:${Math.max(7,v/5*48)}px;flex:1" title="${v}/5"></div>`).join('');
   document.getElementById('sr-vitBtns').innerHTML=[0,1,2,3,4,5].map(n=>`<button class="vbtn${window.S.srVitality===n?' sel':''}" onclick="setSRVitality(${n})">${n}</button>`).join('');
 }
-function setTemp(n){
+window.setTemp = function(n){
   window.S.tempScore=n;save({tempScore:n});
   document.querySelectorAll('#tempBtns .tbtn').forEach((b,i)=>b.classList.toggle('sel',i===n));
   document.getElementById('tempDesc').textContent=TEMP_DESCS[n];
 }
-function setSRVitality(n){
+window.setSRVitality = function(n){
   window.S.srVitality=n;save({srVitality:n});
   document.querySelectorAll('#sr-vitBtns .vbtn').forEach((b,i)=>b.classList.toggle('sel',i===n));
 }
-function submitSundayReview(){
+window.submitSundayReview = function(){
   if(window.S.tempScore===null){alert('Поставь температуру недели');return;}
   // Save snapshot for monthly report
   const weekNum=window.S.tempHistory.length+1;
@@ -1304,16 +1311,16 @@ function submitSundayReview(){
 
 // ── MONTHLY REPORT ──
 let selectedMonth = new Date().getMonth();
-function renderMonthSelector(){
+window.renderMonthSelector = function(){
   document.getElementById('monthSelector').innerHTML=MONTHS.map((m,i)=>{
     const mIdx=i+4;// May=4
     return`<button class="msel-btn${selectedMonth===mIdx?' active':''}" onclick="selectMonth(${mIdx})">${m}</button>`;
   }).join('');
 }
-function selectMonth(m){selectedMonth=m;renderMonthSelector();renderMonthly();}
-function renderMonthly(){
+window.selectMonth = function(m){selectedMonth=m;renderMonthSelector();renderMonthly();}
+window.renderMonthly = function(){
   const mKey='month_'+selectedMonth;
-  const snaps=(window.S.monthlySnapshots&&window.S.monthlySnapshots[mKey])||[];
+  const snaps=((window.S.monthlySnapshots||{})[mKey])||[];
   const mName=MONTHS[selectedMonth-4]||'—';
   const totalXP=snaps.reduce((s,w)=>s+w.weekXP,0);
   const avgTemp=snaps.length?Math.round(snaps.reduce((s,w)=>s+w.temp,0)/snaps.length*10)/10:'—';
@@ -1345,7 +1352,7 @@ function renderMonthly(){
 }
 
 // ── BOSSES ──
-function renderBosses(){
+window.renderBosses = function(){
   document.getElementById('quarterBosses').innerHTML=QUARTER_BOSSES.map(b=>{
     const doneCount=b.conditions.filter((_,i)=>window.S.kcDone[`${b.q}_${i}`]).length;
     const pct=Math.round(doneCount/b.conditions.length*100);
@@ -1361,23 +1368,23 @@ function renderBosses(){
   }).join('');
   updateYearBossHP();
 }
-function toggleKC(key){window.S.kcDone[key]=!window.S.kcDone[key];save({kcDone:window.S.kcDone});renderBosses();}
-function updateYearBossHP(){
+window.toggleKC = function(key){window.S.kcDone[key]=!window.S.kcDone[key];save({kcDone:window.S.kcDone});renderBosses();}
+window.updateYearBossHP = function(){
   const total=QUARTER_BOSSES.reduce((s,b)=>s+b.conditions.length,0);
-  const done=Object.values(window.S.kcDone).filter(Boolean).length;
+  const done=Object.values(window.S.kcDone||{}).filter(Boolean).length;
   const hp=Math.max(0,Math.round((1-done/total)*100));
   document.getElementById('yearBossHP').style.width=hp+'%';
   document.getElementById('yearBossHPLbl').textContent=hp+' HP';
 }
 
 // ── FROZEN ──
-function renderFrozen(){
+window.renderFrozen = function(){
   document.getElementById('frozenGrid').innerHTML=FROZEN.map(f=>`<div class="frozen-card"><div class="frozen-name">❄ ${f.name}</div><div class="frozen-until">→ ${f.until}</div><div class="frozen-desc">${f.desc}</div></div>`).join('');
   document.getElementById('influenceSubs').innerHTML=INFLUENCE_SUBS.map(s=>`<div class="isub"><div class="isub-icon">${s.icon}</div><div><div class="isub-name">${s.name}</div><div class="isub-desc">${s.desc}</div></div></div>`).join('');
 }
 
 // ── XP ──
-function updateXPDisplay(){
+window.updateXPDisplay = function(){
   const xp=Math.max(0,window.S.totalXP);
   document.getElementById('totalXPDisp').textContent=xp;
   const pct=Math.min(100,Math.round(xp/8000*100));
@@ -1439,7 +1446,7 @@ let slogState = {
   improvedTags: [],
 };
 
-function renderSpecialtyBtns() {
+window.renderSpecialtyBtns = function() {
   const el = document.getElementById('specialtyBtns');
   if (!el) return;
   el.innerHTML = SPECIALTIES.map(s =>
@@ -1448,7 +1455,7 @@ function renderSpecialtyBtns() {
     </button>`).join('');
 }
 
-function selectSpecialty(id) {
+window.selectSpecialty = function(id) {
   slogState.specialty = id; slogState.proc = null;
   renderSpecialtyBtns();
   document.getElementById('procedureStep').style.display = 'block';
@@ -1458,7 +1465,7 @@ function selectSpecialty(id) {
   updateSummary();
 }
 
-function renderProcGrid() {
+window.renderProcGrid = function() {
   const spec = SPECIALTIES.find(s => s.id === slogState.specialty);
   if (!spec) return;
   const el = document.getElementById('procGrid');
@@ -1470,14 +1477,14 @@ function renderProcGrid() {
     </button>`).join('');
 }
 
-function getFrequentProcs() {
+window.getFrequentProcs = function() {
   if (!window.S.slogEntries || !window.S.slogEntries.length) return [];
   const counts = {};
   window.S.slogEntries.forEach(e => { if(e.proc) counts[e.proc] = (counts[e.proc]||0)+1; });
   return Object.entries(counts).filter(([,v])=>v>=2).map(([k])=>k);
 }
 
-function selectProc(p) {
+window.selectProc = function(p) {
   slogState.proc = p;
   renderProcGrid();
   document.getElementById('roleStep').style.display = 'block';
@@ -1485,14 +1492,14 @@ function selectProc(p) {
   updateSummary();
 }
 
-function selectCustomProc() {
+window.selectCustomProc = function() {
   const val = document.getElementById('slog-proc-custom').value.trim();
   if (!val) return;
   selectProc(val);
   document.getElementById('slog-proc-custom').value = '';
 }
 
-function renderRoleGrid() {
+window.renderRoleGrid = function() {
   const el = document.getElementById('roleGrid');
   if (!el) return;
   el.innerHTML = ROLES.map(r =>
@@ -1502,7 +1509,7 @@ function renderRoleGrid() {
     </button>`).join('');
 }
 
-function selectRole(label, score) {
+window.selectRole = function(label, score) {
   slogState.role = label; slogState.autonomyScore = score;
   window.S.autonomyScore = score;
   renderRoleGrid();
@@ -1512,7 +1519,7 @@ function selectRole(label, score) {
   document.getElementById('slogSummary').style.display = 'block';
 }
 
-function renderImprovedTags() {
+window.renderImprovedTags = function() {
   const el = document.getElementById('improvedTags');
   if (!el) return;
   el.innerHTML = IMPROVED_TAGS.map(t =>
@@ -1520,13 +1527,13 @@ function renderImprovedTags() {
   ).join('');
 }
 
-function toggleImprovedTag(t) {
+window.toggleImprovedTag = function(t) {
   const i = slogState.improvedTags.indexOf(t);
   if (i>=0) slogState.improvedTags.splice(i,1); else slogState.improvedTags.push(t);
   renderImprovedTags();
 }
 
-function updateSummary() {
+window.updateSummary = function() {
   const spec = SPECIALTIES.find(s => s.id === slogState.specialty);
   document.getElementById('sum-specialty').textContent = spec ? spec.name : '—';
   document.getElementById('sum-proc').textContent = slogState.proc || '—';
@@ -1550,7 +1557,7 @@ const MORNING_RECS = {
   4:{mode:'NORMAL MODE',color:'var(--mint)',phrase:'Хороший день. Сделай одно стратегическое действие сверх базового.'},
   5:{mode:'FULL POWER',color:'var(--pink)',phrase:'Используй энергию. Это день для важного — операция, заявка, или разговор с Алишером.'},
 };
-function renderMorningBtns(){
+window.renderMorningBtns = function(){
   const el=document.getElementById('morningBtns');
   if(!el)return;
   el.innerHTML=MORNING_OPTS.map(o=>
@@ -1562,14 +1569,14 @@ function renderMorningBtns(){
     showRecommendation(window.S.morningScore);
   }
 }
-function setMorning(v){
+window.setMorning = function(v){
   window.S.morningScore=v;
   document.querySelectorAll('.mbtn').forEach((b,i)=>b.classList.toggle('sel',MORNING_OPTS[i].v===v));
   document.getElementById('morningDoneBadge').style.display='flex';
   showRecommendation(v);
   save({morningScore:v});
 }
-function showRecommendation(v){
+window.showRecommendation = function(v){
   const rec=MORNING_RECS[v];
   const box=document.getElementById('recommendationBox');
   document.getElementById('recMode').textContent=rec.mode;
@@ -1580,7 +1587,7 @@ function showRecommendation(v){
 
 // ── EVENING LOG DAY ──
 const MOODS=['😤','😔','😐','🙂','😊','🥰'];
-function renderEveningForm(){
+window.renderEveningForm = function(){
   const anyDone=Object.values(window.S.dailyDone).some(Boolean);
   const alreadyLogged=window.S.todayLogged;
   const hint=document.getElementById('eveningUnlockHint');
@@ -1612,17 +1619,17 @@ function renderEveningForm(){
   if(vb) vb.innerHTML=[0,1,2,3,4,5].map(n=>
     `<button class="vbtn${window.S.vitality===n?' sel':''}" onclick="setVitality(${n})">${n}</button>`).join('');
 }
-function setMood(i){
+window.setMood = function(i){
   window.S.todayMood=i;
   document.querySelectorAll('.mood-btn').forEach((b,j)=>b.classList.toggle('sel',j===i));
   save({todayMood:i});
 }
-function setVitality(n){
+window.setVitality = function(n){
   window.S.vitality=n;
   document.querySelectorAll('#vitBtns .vbtn').forEach((b,i)=>b.classList.toggle('sel',i===n));
   save({vitality:n});
 }
-function logDay(){
+window.logDay = function(){
   const note=document.getElementById('dayNote')?document.getElementById('dayNote').value.trim():'';
   const mode=getMorningMode();
   const isProtected=mode==='survival'||mode==='recovery';
@@ -1647,7 +1654,7 @@ function logDay(){
   renderDayData();
   updateXPDisplay();
 }
-function getMorningMode(){
+window.getMorningMode = function(){
   const v=window.S.morningScore;
   if(!v||v>=4)return'normal';
   if(v===3)return'lowbat';
@@ -1656,7 +1663,7 @@ function getMorningMode(){
 }
 
 // initial render (before Firebase loads)
-renderAll();
+// renderAll() called by Firebase onValue
 </script>
 </body>
 </html>
