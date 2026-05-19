@@ -672,7 +672,7 @@ window.saveToFirebase = function() {}; // placeholder until module loads
 </script>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, onValue, get, set, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, get, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbywbdkhr_IQSwX1dh31-s2lUg-Rw_hwqLqeRAlsTYBBXch0HuxrrzYrQaofBf2b1vzp/exec';
 
@@ -690,128 +690,137 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const ROOT = 'bota_rpg';
 
-// ── SYNC STATUS ──
-window.setSyncStatus = function(status, label) {
+function setSyncStatus(status, label) {
   const dot = document.getElementById('syncDot');
   const lbl = document.getElementById('syncLabel');
-  dot.className = 'sync-dot ' + status;
-  lbl.textContent = label;
+  if(dot) dot.className = 'sync-dot ' + status;
+  if(lbl) lbl.textContent = label;
 }
 
-// ── STATE ── (defaults defined in inline script above)
-let dbReady = false;
+// ── KEY HELPERS ──
+function dateKey(d) {
+  // Returns YYYY-MM-DD for a Date object
+  return d.toISOString().slice(0, 10);
+}
+function todayKey() {
+  return dateKey(new Date());
+}
+window.dateKey = dateKey;
+window.todayKey = todayKey;
 
-// Load from Firebase — one-time read, no realtime listener loop
-setSyncStatus('syncing', 'Загрузка...');
-get(ref(db, ROOT)).then((snapshot) => {
-  const data = snapshot.val();
-  if (data) Object.assign(window.S, data);
-  dbReady = true;
+// ── SAVE helpers ──
+// Save global (non-day) data
+window.saveGlobal = function(partial) {
+  update(ref(db, ROOT + '/global'), partial)
+    .then(() => setSyncStatus('connected', 'Синхронизировано ✓'))
+    .catch(() => setSyncStatus('error', 'Ошибка сохранения'));
+};
 
-  // Day reset: if lastStreakDay != today, clear daily state
-  const todayStr = new Date().toDateString();
-  if (window.S.lastStreakDay && window.S.lastStreakDay !== todayStr) {
-    window.S.todayLogged = false;
-    window.S.dailyDone = {};
-    window.S.morningScore = null;
-    window.S.todayMood = null;
-    window.S.vitality = null;
-    update(ref(db, ROOT), {
-      todayLogged: false, dailyDone: {}, morningScore: null, todayMood: null, vitality: null
-    });
-  }
+// Save day-specific data
+window.saveDay = function(key, partial) {
+  update(ref(db, ROOT + '/days/' + key), partial)
+    .then(() => setSyncStatus('connected', 'Синхронизировано ✓'))
+    .catch(() => setSyncStatus('error', 'Ошибка сохранения'));
+};
 
-  setSyncStatus('connected', 'Синхронизировано ✓');
-  document.getElementById('syncUser').textContent = 'bota · synced';
-  renderAll();
-}).catch((err) => {
-  setSyncStatus('error', 'Ошибка соединения');
-  renderAll();
-});
-
-// Save to Firebase
+// Legacy save — routes to global
 window.saveToFirebase = function(partial) {
-  if (!dbReady) return;
-  setSyncStatus('syncing', 'Сохранение...');
-  update(ref(db, ROOT), partial).then(() => {
-    setSyncStatus('connected', 'Синхронизировано');
-  }).catch(() => setSyncStatus('error', 'Ошибка сохранения'));
+  window.saveGlobal(partial);
+};
+window.save = function(partial) {
+  window.saveGlobal(partial);
+};
+
+// ── LOAD ──
+setSyncStatus('syncing', 'Загрузка...');
+
+async function loadAll() {
+  try {
+    // Load global state
+    const globalSnap = await get(ref(db, ROOT + '/global'));
+    const globalData = globalSnap.val() || {};
+    Object.assign(window.S, globalData);
+
+    // Load today's day data
+    const tk = todayKey();
+    const daySnap = await get(ref(db, ROOT + '/days/' + tk));
+    const dayData = daySnap.val() || {};
+    window.DAYS = window.DAYS || {};
+    window.DAYS[tk] = dayData;
+
+    // Also load surgery log entries (global)
+    const slogSnap = await get(ref(db, ROOT + '/slogEntries'));
+    if(slogSnap.val()) window.S.slogEntries = slogSnap.val();
+
+    setSyncStatus('connected', 'Синхронизировано ✓');
+    document.getElementById('syncUser').textContent = 'bota · synced';
+  } catch(e) {
+    setSyncStatus('error', 'Ошибка соединения');
+    console.error(e);
+  }
+  renderAll();
+}
+
+loadAll();
+
+// ── GET/SET DAY DATA ──
+window.getDayData = async function(key) {
+  if(window.DAYS && window.DAYS[key]) return window.DAYS[key];
+  try {
+    const snap = await get(ref(db, ROOT + '/days/' + key));
+    const data = snap.val() || {};
+    window.DAYS = window.DAYS || {};
+    window.DAYS[key] = data;
+    return data;
+  } catch(e) { return {}; }
+};
+
+window.updateDayData = function(key, partial) {
+  window.DAYS = window.DAYS || {};
+  window.DAYS[key] = Object.assign(window.DAYS[key] || {}, partial);
+  update(ref(db, ROOT + '/days/' + key), partial)
+    .then(() => setSyncStatus('connected', '✓'))
+    .catch(() => setSyncStatus('error', 'Ошибка'));
 };
 
 // ── GOOGLE SHEETS SYNC ──
 window.syncToSheets = async function() {
-  if (!window.S.slogEntries.length) { alert('Нет записей для экспорта'); return; }
+  if (!window.S.slogEntries || !window.S.slogEntries.length) { alert('Нет записей для экспорта'); return; }
   const btn = document.getElementById('sheetsBtn');
   btn.textContent = '⏳ SYNCING...'; btn.className = 'slog-sheets syncing';
-
-  // Send all unsynced entries
   const unsynced = window.S.slogEntries.filter(e => !e.synced);
   if (!unsynced.length) {
     btn.textContent = '✓ ALL SYNCED'; btn.className = 'slog-sheets ok';
     setTimeout(() => { btn.textContent = '📊 SYNC TO SHEETS'; btn.className = 'slog-sheets'; }, 2000);
     return;
   }
-
-  let successCount = 0;
+  let ok = 0;
   for (const entry of unsynced) {
-    try {
-      // Use a form-based POST which bypasses CORS for Apps Script
-      await sendToSheets(entry);
-      entry.synced = true;
-      successCount++;
-    } catch(e) {
-      console.error('Sync error:', e);
-    }
+    try { await sendToSheets(entry); entry.synced = true; ok++; } catch(e) {}
   }
-
-  if (successCount > 0) {
-    save({ slogEntries: window.S.slogEntries });
-    btn.textContent = '✓ ' + successCount + ' SYNCED'; btn.className = 'slog-sheets ok';
+  if (ok > 0) {
+    update(ref(db, ROOT + '/slogEntries'), Object.fromEntries(window.S.slogEntries.map((e,i)=>[i,e])));
+    btn.textContent = '✓ ' + ok + ' SYNCED'; btn.className = 'slog-sheets ok';
   } else {
     btn.textContent = '✗ ERROR'; btn.className = 'slog-sheets';
   }
   setTimeout(() => { btn.textContent = '📊 SYNC TO SHEETS'; btn.className = 'slog-sheets'; }, 3000);
 };
 
-window.sendToSheets = function(entry) {
-  return new Promise((resolve, reject) => {
-    // Create hidden form and submit via iframe to bypass CORS
+function sendToSheets(entry) {
+  return new Promise((resolve) => {
     const iframe = document.createElement('iframe');
-    iframe.name = 'sheets_iframe_' + Date.now();
+    iframe.name = 'sf_' + Date.now();
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
-
     const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = SHEETS_URL;
-    form.target = iframe.name;
-    form.style.display = 'none';
-
-    // Apps Script with POST via form needs data as a field
+    form.method = 'POST'; form.action = SHEETS_URL; form.target = iframe.name; form.style.display = 'none';
     const field = document.createElement('input');
-    field.type = 'hidden';
-    field.name = 'payload';
-    field.value = JSON.stringify({
-      date: entry.date || '',
-      proc: entry.proc || '',
-      role: entry.role || '',
-      improved: entry.improved || '',
-      next: entry.next || '',
-      score: entry.score !== undefined ? entry.score : ''
-    });
-    form.appendChild(field);
-    document.body.appendChild(form);
-
-    iframe.onload = () => {
-      document.body.removeChild(form);
-      document.body.removeChild(iframe);
-      resolve();
-    };
-    setTimeout(() => {
-      try { document.body.removeChild(form); document.body.removeChild(iframe); } catch(e){}
-      resolve(); // resolve anyway after timeout
-    }, 5000);
-
+    field.type = 'hidden'; field.name = 'payload';
+    field.value = JSON.stringify({date:entry.date||'',proc:entry.proc||'',role:entry.role||'',improved:entry.improved||'',next:entry.next||'',score:entry.score??''});
+    form.appendChild(field); document.body.appendChild(form);
+    iframe.onload = () => { try{document.body.removeChild(form);document.body.removeChild(iframe);}catch(e){} resolve(); };
+    setTimeout(() => { try{document.body.removeChild(form);document.body.removeChild(iframe);}catch(e){} resolve(); }, 5000);
     form.submit();
   });
 }
@@ -920,641 +929,140 @@ window.switchTab = function(id){
 // ── DATE NAVIGATION ──
 window.viewDate = new Date();
 window.viewDate.setHours(0,0,0,0);
-
-window.getDateKey = function(d) {
-  return d.toISOString().slice(0,10); // YYYY-MM-DD
-}
-
-window.getTodayKey = function() {
-  const t = new Date(); t.setHours(0,0,0,0);
-  return getDateKey(t);
-}
-
-window.isToday = function() {
-  return window.getDateKey(window.viewDate) === getTodayKey();
-}
+window.DAYS = window.DAYS || {};
 
 window.shiftDay = function(delta) {
-  const newDate = new Date(window.viewDate);
-  newDate.setDate(newDate.getDate() + delta);
+  const d = new Date(window.viewDate);
+  d.setDate(d.getDate() + delta);
   const today = new Date(); today.setHours(0,0,0,0);
-  if (newDate > today) return;
-  window.viewDate = newDate;
-  renderDateNav();
-  renderDayData();
-}
+  if (d > today) return;
+  window.viewDate = d;
+  loadAndRenderDay();
+};
 
-window.renderDateNav = function() {
+function loadAndRenderDay() {
+  const key = window.dateKey(window.viewDate);
+  renderDateNav();
+  if (window.DAYS[key]) {
+    renderTodayContent(key, window.DAYS[key]);
+  } else {
+    // Load from Firebase then render
+    window.getDayData(key).then(data => {
+      window.DAYS[key] = data;
+      renderTodayContent(key, data);
+    });
+  }
+}
+window.loadAndRenderDay = loadAndRenderDay;
+
+function renderDateNav() {
   const today = new Date(); today.setHours(0,0,0,0);
-  const isT = isToday();
-  const dayNames = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+  const isT = window.viewDate.getTime() === today.getTime();
   const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  const days = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
   const el = document.getElementById('dateDisplay');
   const sub = document.getElementById('dateSub');
   const nextBtn = document.getElementById('nextDayBtn');
   if (!el) return;
-  el.textContent = isT ? 'Сегодня' : `${window.viewDate.getDate()} ${months[window.viewDate.getMonth()]}`;
-  sub.textContent = isT ? `${window.viewDate.getDate()} ${months[window.viewDate.getMonth()]} · ${dayNames[viewDate.getDay()]}` : dayNames[viewDate.getDay()];
-  if (nextBtn) nextBtn.disabled = isT;
+  el.textContent = isT ? 'Сегодня' : window.viewDate.getDate() + ' ' + months[window.viewDate.getMonth()];
+  if(sub) sub.textContent = days[window.viewDate.getDay()] + (isT ? ' · ' + window.viewDate.getDate() + ' ' + months[window.viewDate.getMonth()] : '');
+  if(nextBtn) nextBtn.disabled = isT;
 }
 
-window.getDayState = function() {
-  // Returns state object for viewDate
-  const key = window.getDateKey(window.viewDate);
-  const todayKey = getTodayKey();
-  if (key === todayKey) {
-    return {
-      dailyDone: window.S.dailyDone || {},
-      morningScore: window.S.morningScore,
-      todayLogged: window.S.todayLogged,
-      vitality: window.S.vitality,
-      todayMood: window.S.todayMood,
-      isPast: false,
-    };
+function renderTodayContent(key, dayData) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const isToday = window.viewDate.getTime() === today.getTime();
+  const dailyDone = dayData.dailyDone || {};
+  const morningScore = dayData.morningScore || null;
+  const logged = !!dayData.logged;
+
+  // Morning
+  const morningEl = document.getElementById('morningBtns');
+  const morningBadge = document.getElementById('morningDoneBadge');
+  const recBox = document.getElementById('recommendationBox');
+  if (morningEl) {
+    morningEl.innerHTML = MORNING_OPTS.map(o =>
+      `<button class="mbtn${morningScore===o.v?' sel':''}" ${isToday?`onclick="setMorning('${key}',${o.v})"`:''} ${!isToday?'disabled':''}>
+        ${o.emoji}<span class="mbtn-lbl">${o.lbl}</span>
+      </button>`).join('');
   }
-  // Past day — look up in dayLog
-  const log = (window.S.dayLog || []).find(e => {
-    const d = new Date(e.ts); d.setHours(0,0,0,0);
-    return window.getDateKey(d) === key;
-  });
-  return {
-    dailyDone: log ? (log.dailyDone || {}) : {},
-    morningScore: log ? log.morning : null,
-    todayLogged: !!log,
-    vitality: log ? log.vitality : null,
-    todayMood: log ? log.mood : null,
-    isPast: true,
-    log,
-  };
-}
-
-window.renderDayData = function() {
-  renderDateNav();
-  const state = getDayState();
-  const isPast = state.isPast;
-
-  // Morning card
-  window.renderMorningBtnsForState && window.renderMorningBtnsForState(state.morningScore, isPast);
-  if (state.morningScore) showRecommendation(state.morningScore);
+  if (morningBadge) morningBadge.style.display = morningScore ? 'flex' : 'none';
+  if (recBox) {
+    if (morningScore) { showRecommendation(morningScore); recBox.style.display = 'block'; }
+    else recBox.style.display = 'none';
+  }
 
   // Daily quests
-  renderDailyQuestsForState(state.dailyDone, isPast);
+  const list = document.getElementById('dailyList');
+  if (list) {
+    list.innerHTML = DAILY_QUESTS.map(q => {
+      const done = !!dailyDone[q.id];
+      const clickAttr = isToday ? `onclick="toggleDaily('${key}','${q.id}',${q.xp})"` : '';
+      return `<div class="dq${done?' done':''}${!isToday?' locked':''}" style="--qc:${q.color}" ${clickAttr}>
+        <div class="dq-check">${done?'✓':''}</div>
+        <div><div class="dq-name">${q.name}</div><div class="dq-meta">${q.meta}</div></div>
+        <div class="dq-xp">+${q.xp}</div>
+      </div>`;
+    }).join('');
+  }
 
-  // Evening form
-  renderEveningFormForState(state, isPast);
+  // XP for this day
+  const dayXP = DAILY_QUESTS.filter(q => dailyDone[q.id]).reduce((s,q)=>s+q.xp,0);
+  const todayXPEl = document.getElementById('todayXP');
+  if(todayXPEl) todayXPEl.textContent = dayXP;
+  const weekXPEl = document.getElementById('weekXPDisp');
+  if(weekXPEl) weekXPEl.textContent = window.S.weekXP || 0;
+  const streakEl = document.getElementById('streakDisp');
+  if(streakEl) streakEl.textContent = window.S.streak || 0;
 
-  // XP
-  const todayXP = DAILY_QUESTS.filter(q => state.dailyDone[q.id]).reduce((s,q)=>s+q.xp,0);
-  document.getElementById('todayXP').textContent = todayXP;
-  document.getElementById('weekXPDisp').textContent = Math.max(0, window.S.weekXP || 0);
-  document.getElementById('streakDisp').textContent = window.S.streak || 0;
-}
-
-window.renderMorningBtnsForState = function(score, isPast) {
-  const el = document.getElementById('morningBtns');
-  if (!el) return;
-  const badge = document.getElementById('morningDoneBadge');
-  el.innerHTML = MORNING_OPTS.map(o =>
-    `<button class="mbtn${score===o.v?' sel':''}" onclick="${isPast?'':'setMorning('+o.v+')'}" ${isPast?'disabled':''}>
-      ${o.emoji}<span class="mbtn-lbl">${o.lbl}</span>
-    </button>`).join('');
-  if (badge) badge.style.display = score ? 'flex' : 'none';
-}
-
-window.renderDailyQuestsForState = function(dailyDone, isPast) {
-  const el = document.getElementById('dailyList');
-  if (!el) return;
-  el.innerHTML = DAILY_QUESTS.map(q => {
-    const done = !!dailyDone[q.id];
-    const clickAttr = isPast ? '' : `onclick="toggleDaily('${q.id}',${q.xp})"`;
-    return `<div class="dq${done?' done':''}${isPast?' locked':''}" style="--qc:${q.color}" ${clickAttr}>
-      <div class="dq-check">${done?'✓':''}</div>
-      <div><div class="dq-name">${q.name}</div><div class="dq-meta">${q.meta}</div></div>
-      <div class="dq-xp">+${q.xp}</div>
-    </div>`;
-  }).join('');
-}
-
-window.renderEveningFormForState = function(state, isPast) {
+  // Evening Log Day
   const hint = document.getElementById('eveningUnlockHint');
   const form = document.getElementById('eveningForm');
   const badge = document.getElementById('eveningDoneBadge');
   const shield = document.getElementById('streakShield');
 
-  if (isPast) {
-    if (hint) hint.style.display = 'none';
-    if (shield) shield.style.display = 'none';
-    if (state.todayLogged && state.log) {
-      if (form) form.style.display = 'none';
-      if (badge) badge.style.display = 'flex';
-    } else {
-      if (form) form.style.display = 'none';
-      if (badge) badge.style.display = 'none';
-      if (hint) { hint.textContent = 'День не залогирован'; hint.style.display = 'block'; }
+  if (!isToday) {
+    // Past day — read only
+    if(hint) hint.style.display = 'none';
+    if(form) form.style.display = 'none';
+    if(shield) shield.style.display = 'none';
+    if(badge) badge.style.display = logged ? 'flex' : 'none';
+    if(!logged && hint) { hint.textContent = 'День не залогирован'; hint.style.display = 'block'; }
+    return;
+  }
+
+  // Today
+  if(badge) badge.style.display = logged ? 'flex' : 'none';
+  if(shield) shield.style.display = 'none';
+  if (logged) {
+    if(form) form.style.display = 'none';
+    if(hint) hint.style.display = 'none';
+    return;
+  }
+  const anyDone = Object.values(dailyDone).some(Boolean);
+  if (anyDone) {
+    if(hint) hint.textContent = '';
+    if(form) {
+      form.style.display = 'block';
+      // Render vitality and mood buttons for today
+      const vb = document.getElementById('vitBtns');
+      if(vb) vb.innerHTML = [0,1,2,3,4,5].map(n =>
+        `<button class="vbtn${(dayData.vitality===n)?' sel':''}" onclick="setVitality('${key}',${n})">${n}</button>`).join('');
+      const mb = document.getElementById('moodBtns');
+      if(mb) mb.innerHTML = MOODS.map((m,i) =>
+        `<button class="mood-btn${dayData.mood===i?' sel':''}" onclick="setMood('${key}',${i})">${m}</button>`).join('');
     }
-    return;
-  }
-
-  // Today logic
-  if (badge) badge.style.display = state.todayLogged ? 'flex' : 'none';
-  if (state.todayLogged) {
-    if (form) form.style.display = 'none';
-    if (hint) hint.style.display = 'none';
-    return;
-  }
-  const anyDone = Object.values(state.dailyDone).some(Boolean);
-  const mode = getMorningMode();
-  const isProtected = mode === 'survival' || mode === 'recovery';
-  if (isProtected && shield) shield.style.display = 'flex';
-  if (anyDone || isProtected) {
-    if (hint) hint.textContent = '';
-    if (form) form.style.display = 'block';
-    // render vit btns and mood
-    const vb = document.getElementById('vitBtns');
-    if (vb) vb.innerHTML = [0,1,2,3,4,5].map(n =>
-      `<button class="vbtn${window.S.vitality===n?' sel':''}" onclick="setVitality(${n})">${n}</button>`).join('');
-    const mb = document.getElementById('moodBtns');
-    if (mb) mb.innerHTML = MOODS.map((m,i) =>
-      `<button class="mood-btn${window.S.todayMood===i?' sel':''}" onclick="setMood(${i})">${m}</button>`).join('');
   } else {
-    if (hint) { hint.textContent = 'Выполни хотя бы 1 квест чтобы разблокировать'; hint.style.display = 'block'; }
+    if(hint) { hint.textContent = 'Выполни хотя бы 1 квест чтобы разблокировать'; hint.style.display = 'block'; }
+    if(form) form.style.display = 'none';
   }
 }
-
-window.renderAll = function(){
-  renderWins(); renderSpecialtyBtns();
-  renderWeeklyDomains(); renderAutonomyBtns(); renderSlogEntries();
-  renderMoneyActions(); renderMoneyProgress(); renderMoneyLog(); renderMoneyBoss();
-  renderBosses(); renderFrozen(); renderMonthSelector(); updateXPDisplay();
-  document.getElementById('daysLeft').textContent = daysLeft();
-  if(window.renderDayData) window.renderDayData();
-}
-
-// ── WIN CONDITIONS ──
-window.renderWins = function(){
-  document.getElementById('winsGrid').innerHTML = WIN_CONDITIONS.map(w=>`
-    <div class="win-card" style="--wc:${w.color}">
-      <div class="win-icon">${w.icon}</div>
-      <div class="win-name">${w.name}</div>
-      <div class="win-goal">${w.goal}</div>
-    </div>`).join('');
-}
-
-// ── VITALITY ──
-window.renderVitality = function(){
-  document.getElementById('vitBtns').innerHTML=[0,1,2,3,4,5].map(n=>`<button class="vbtn${window.S.vitality===n?' sel':''}" onclick="setVitality(${n})">${n}</button>`).join('');
-  if(window.S.vitality!==null) document.getElementById('vitScore').textContent=window.S.vitality;
-  updateModeDisplay();
-}
-window.setVitality = function(n){
-  window.S.vitality=n;
-  document.getElementById('vitScore').textContent=n;
-  document.querySelectorAll('#vitBtns .vbtn').forEach((b,i)=>b.classList.toggle('sel',i===n));
-  updateModeDisplay(); renderDailyQuests();
-  save({vitality:n});
-}
-window.updateModeDisplay = function(){
-  const mode=getMode(window.S.vitality);const m=MODES[mode];
-  document.getElementById('modeBadge').innerHTML=`<span class="mode-badge ${m.cls}">${m.label} · ЗАВТРА</span>`;
-  document.getElementById('modeDesc').textContent=m.desc;
-  document.getElementById('survivalBanner').classList.toggle('show',mode==='survival');
-}
-
-// ── DAILY QUESTS ──
-window.renderDailyQuests = function(){
-  const mode=getMode(window.S.vitality);
-  document.getElementById('dailyList').innerHTML=DAILY_QUESTS.map(q=>{
-    const done=!!window.S.dailyDone[q.id];const avail=true;
-    return`<div class="dq${done?' done':''}${!avail?' locked':''}" style="--qc:${q.color}" onclick="toggleDaily('${q.id}',${q.xp})">
-      <div class="dq-check">${done?'✓':''}</div>
-      <div><div class="dq-name">${q.name}</div><div class="dq-meta">${q.meta}</div></div>
-      <div class="dq-xp">+${q.xp}</div></div>`;
-  }).join('');
-}
-window.toggleDaily = function(id,xp){
-  if (!isToday()) return; // can't edit past days
-  const was=!!window.S.dailyDone[id];
-  window.S.dailyDone[id]=!was;
-  window.S.totalXP+=was?-xp:xp; window.S.weekXP+=was?-xp:xp;
-  save({dailyDone:window.S.dailyDone,totalXP:window.S.totalXP,weekXP:window.S.weekXP});
-  renderDayData(); updateXPDisplay();
-}
-
-// ── WEEKLY ──
-window.renderWeeklyDomains = function(){
-  document.getElementById('weeklyDomains').innerHTML=WEEKLY_DOMAINS.map(d=>{
-    const doneCount=d.quests.filter(q=>(window.S.sqDone||{})[q.id]).length;
-    const pct=Math.round(doneCount/d.quests.length*100);
-    const achieved=doneCount>=d.threshold;
-    return`<div class="domain-week">
-      <div class="dw-header">
-        <div class="dw-title-row"><span class="dw-icon">${d.icon}</span><span class="dw-name" style="color:${d.color}">${d.name}</span></div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <div class="dw-progress-wrap"><div class="dw-bar"><div class="dw-fill" style="width:${pct}%;background:${d.color}"></div></div><span class="dw-pct">${doneCount}/${d.quests.length}</span></div>
-          <span class="dw-win ${achieved?'achieved':'pending'}">${achieved?'✓ WIN':'pending'}</span>
-        </div>
-      </div>
-      <div class="side-quests">${d.quests.map(q=>{
-        const done=!!(window.S.sqDone||{})[q.id];
-        return`<div class="sq${done?' done':''}" style="--sqc:${d.color}" onclick="toggleSQ('${q.id}',${q.xp})">
-          <div class="sq-check" style="border-color:${d.color}">${done?'✓':''}</div>
-          <span class="sq-text">${q.text}</span><span class="sq-xp">+${q.xp}</span></div>`;
-      }).join('')}</div></div>`;
-  }).join('');
-}
-window.toggleSQ = function(id,xp){
-  if(!window.S.sqDone)window.S.sqDone={};
-  const was=!!window.S.sqDone[id];window.S.sqDone[id]=!was;
-  window.S.totalXP+=was?-xp:xp;window.S.weekXP+=was?-xp:xp;
-  save({sqDone:window.S.sqDone,totalXP:window.S.totalXP,weekXP:window.S.weekXP});
-  renderWeeklyDomains(); updateXPDisplay();
-}
-
-// ── SURGERY LOG ──
-window.renderAutonomyBtns = function(){
-  const el = document.getElementById('autonomyBtns');
-  if (!el) return;
-  el.innerHTML=AUTONOMY_LABELS.map((lbl,n)=>
-    `<button class="abtn${slogState.autonomyScore===n?' sel':''}" onclick="setAutonomy(${n})">${lbl}</button>`).join('');
-}
-window.setAutonomy = function(n){
-  slogState.autonomyScore=n; window.S.autonomyScore=n;
-  // sync with role selection
-  const matchRole = ROLES.find(r=>r.score===n);
-  if(matchRole){ slogState.role=matchRole.label; renderRoleGrid(); }
-  updateSummary(); renderAutonomyBtns();
-}
-window.saveLog = function(){
-  if(!slogState.proc){alert('Выбери операцию');return;}
-  const tags = slogState.improvedTags.join(', ');
-  const customImproved = document.getElementById('slog-improved') ? document.getElementById('slog-improved').value.trim() : '';
-  const improved = [tags, customImproved].filter(Boolean).join(' · ');
-  const next = document.getElementById('slog-next') ? document.getElementById('slog-next').value.trim() : '';
-  const spec = SPECIALTIES.find(s => s.id === slogState.specialty);
-  const entry={
-    proc: slogState.proc,
-    specialty: spec ? spec.name : '',
-    date:new Date().toLocaleDateString('ru'),
-    role: slogState.role || '',
-    improved: improved,
-    next: next,
-    score: slogState.autonomyScore,
-    ts:Date.now()
-  };
-  window.S.slogEntries.unshift(entry);
-  window.S.totalXP+=120;window.S.weekXP+=120;
-  if(!window.S.sqDone['wq_slog'])window.S.sqDone['wq_slog']=true;
-  save({slogEntries:window.S.slogEntries,totalXP:window.S.totalXP,weekXP:window.S.weekXP,sqDone:window.S.sqDone});
-  // reset form
-  slogState = {specialty:null,proc:null,role:null,autonomyScore:null,improvedTags:[]};
-  window.S.autonomyScore=null;
-  if(document.getElementById('slog-improved')) document.getElementById('slog-improved').value='';
-  if(document.getElementById('slog-next')) document.getElementById('slog-next').value='';
-  if(document.getElementById('slog-proc-custom')) document.getElementById('slog-proc-custom').value='';
-  document.getElementById('procedureStep').style.display='none';
-  document.getElementById('roleStep').style.display='none';
-  document.getElementById('detailsStep').style.display='none';
-  document.getElementById('slogSummary').style.display='none';
-  renderSpecialtyBtns(); renderSlogEntries(); updateXPDisplay();
-}
-window.renderSlogEntries = function(){
-  const el=document.getElementById('slogEntries');
-  if(!el)return;
-  if(!(window.S.slogEntries||[]).length){el.innerHTML='<div class="note">Нет записей.</div>';return;}
-  el.innerHTML=(window.S.slogEntries||[]).map(e=>`
-    <div class="slog-entry">
-      <div class="entry-meta">
-        <span class="entry-proc">${e.proc}</span>
-        <span class="entry-score">автономия ${e.score??'—'}/5</span>
-      </div>
-      ${e.specialty?`<div style="font-size:7px;color:var(--sky);margin-bottom:3px">${e.specialty}</div>`:''}
-      <div><b>Роль:</b> ${e.role||'—'}</div>
-      <div><b>Улучшилось:</b> ${e.improved||'—'}</div>
-      <div><b>Следующий вопрос:</b> ${e.next||'—'}</div>
-      <div style="font-size:7px;color:var(--muted);margin-top:3px">${e.date}${e.synced?' · ✓ synced':''}</div>
-    </div>`).join('');
-}
-
-// ── MONEY ──
-window.renderMoneyActions = function(){
-  document.getElementById('moneyActions').innerHTML=MONEY_ACTIONS.map(a=>
-    `<div class="action-btn${window.S.moneyAction===a?' sel':''}" onclick="selectMoneyAction('${a}')">${a}</div>`).join('');
-}
-window.selectMoneyAction = function(a){window.S.moneyAction=a;save({moneyAction:a});renderMoneyActions();}
-window.logMoneyAction = function(){
-  if(!window.S.moneyAction){alert('Выбери тип действия');return;}
-  window.S.moneyLog.unshift({type:window.S.moneyAction,date:new Date().toLocaleDateString('ru')});
-  window.S.totalXP+=160;window.S.weekXP+=160;
-  save({moneyLog:window.S.moneyLog,totalXP:window.S.totalXP,weekXP:window.S.weekXP});
-  window.S.moneyAction=null;renderMoneyActions();renderMoneyLog();updateXPDisplay();
-}
-window.setMoneyProgress = function(){
-  const v=parseInt(document.getElementById('moneyInput').value)||0;
-  window.S.moneyCurrent=v;save({moneyCurrent:v});renderMoneyProgress();
-}
-window.renderMoneyProgress = function(){
-  const pct=Math.min(100,Math.round(window.S.moneyCurrent/200000*100));
-  document.getElementById('moneyBar').style.width=pct+'%';
-  document.getElementById('moneyLbl').textContent=(window.S.moneyCurrent||0).toLocaleString('ru')+' KZT/мес';
-}
-window.renderMoneyLog = function(){
-  const el=document.getElementById('moneyLogEntries');
-  if(!(window.S.moneyLog||[]).length){el.innerHTML='<div class="note">Нет записей.</div>';return;}
-  el.innerHTML=(window.S.moneyLog||[]).slice(0,10).map(e=>`<div class="money-entry"><span class="me-type">${e.type}</span><span class="me-date">${e.date}</span></div>`).join('');
-}
-window.renderMoneyBoss = function(){
-  const conds=['4 money-действия выполнены в этом месяце','1 конкретный оффер / заявка / сообщение отправлено'];
-  document.getElementById('moneyBossConditions').innerHTML=conds.map((c,i)=>`
-    <div class="bc${window.S.moneyBossDone[i]?' done':''}" onclick="toggleMoneyBoss(${i})">
-      <div class="bc-box">${window.S.moneyBossDone[i]?'✓':''}</div><span class="bc-txt">${c}</span></div>`).join('');
-  const done=Object.values(window.S.moneyBossDone||{}).filter(Boolean).length;
-  document.getElementById('moneyBossHP').style.width=(100-done*50)+'%';
-}
-window.toggleMoneyBoss = function(i){window.S.moneyBossDone[i]=!window.S.moneyBossDone[i];save({moneyBossDone:window.S.moneyBossDone});renderMoneyBoss();}
-
-// ── SUNDAY REVIEW ──
-window.renderSundayReview = function(){
-  document.getElementById('sr-weekXP').textContent=window.S.weekXP;
-  const dc=Object.values(window.S.dailyDone||{}).filter(Boolean).length;
-  document.getElementById('sr-dailyDone').textContent=dc+'/'+DAILY_QUESTS.length;
-  const ww=WEEKLY_DOMAINS.filter(d=>d.quests.filter(q=>(window.S.sqDone||{})[q.id]).length>=d.threshold).length;
-  document.getElementById('sr-weeklyWins').textContent=ww+'/'+WEEKLY_DOMAINS.length;
-  document.getElementById('sr-domainWins').innerHTML=WEEKLY_DOMAINS.map(d=>{
-    const done=d.quests.filter(q=>window.S.sqDone[q.id]).length;const win=done>=d.threshold;
-    return`<div class="wwin${win?' achieved':''}"><div class="wwin-dot"></div><span>${d.icon} ${d.name} — ${done}/${d.quests.length}${win?' ✓':''}</span></div>`;
-  }).join('');
-  const tb=document.getElementById('tempBtns');
-  tb.innerHTML=[0,1,2,3,4,5].map(n=>`<button class="tbtn${window.S.tempScore===n?' sel':''}" onclick="setTemp(${n})">${n}</button>`).join('');
-  document.getElementById('tempDesc').textContent=window.S.tempScore!==null?TEMP_DESCS[window.S.tempScore]:'Выбери температуру недели';
-  const hist=document.getElementById('tempHistory');
-  hist.innerHTML=(window.S.tempHistory||[]).slice(-8).map(v=>`<div class="th-bar" style="height:${Math.max(7,v/5*48)}px;flex:1" title="${v}/5"></div>`).join('');
-  document.getElementById('sr-vitBtns').innerHTML=[0,1,2,3,4,5].map(n=>`<button class="vbtn${window.S.srVitality===n?' sel':''}" onclick="setSRVitality(${n})">${n}</button>`).join('');
-}
-window.setTemp = function(n){
-  window.S.tempScore=n;save({tempScore:n});
-  document.querySelectorAll('#tempBtns .tbtn').forEach((b,i)=>b.classList.toggle('sel',i===n));
-  document.getElementById('tempDesc').textContent=TEMP_DESCS[n];
-}
-window.setSRVitality = function(n){
-  window.S.srVitality=n;save({srVitality:n});
-  document.querySelectorAll('#sr-vitBtns .vbtn').forEach((b,i)=>b.classList.toggle('sel',i===n));
-}
-window.submitSundayReview = function(){
-  if(window.S.tempScore===null){alert('Поставь температуру недели');return;}
-  // Save snapshot for monthly report
-  const weekNum=window.S.tempHistory.length+1;
-  const snapshot={weekXP:window.S.weekXP,dailyDone:Object.values(window.S.dailyDone).filter(Boolean).length,
-    domainWins:WEEKLY_DOMAINS.filter(d=>d.quests.filter(q=>window.S.sqDone[q.id]).length>=d.threshold).length,
-    temp:window.S.tempScore,date:new Date().toLocaleDateString('ru'),month:new Date().getMonth()};
-  window.S.tempHistory.push(window.S.tempScore);
-  if(!window.S.monthlySnapshots)window.S.monthlySnapshots={};
-  const mKey='month_'+new Date().getMonth();
-  if(!window.S.monthlySnapshots[mKey])window.S.monthlySnapshots[mKey]=[];
-  window.S.monthlySnapshots[mKey].push(snapshot);
-  if(window.S.srVitality!==null)window.S.vitality=window.S.srVitality;
-  const prevWeekXP=window.S.weekXP;
-  window.S.weekXP=0;window.S.dailyDone={};window.S.sqDone={};
-  window.S.tempScore=null;window.S.srVitality=null;
-  save({tempHistory:window.S.tempHistory,monthlySnapshots:window.S.monthlySnapshots,
-    vitality:window.S.vitality,weekXP:0,dailyDone:{},sqDone:{},tempScore:null,srVitality:null});
-  alert('✦ Неделя закрыта! Начинаем следующую.');
-  renderAll();
-}
-
-// ── MONTHLY REPORT ──
-let selectedMonth = new Date().getMonth();
-window.renderMonthSelector = function(){
-  document.getElementById('monthSelector').innerHTML=MONTHS.map((m,i)=>{
-    const mIdx=i+4;// May=4
-    return`<button class="msel-btn${selectedMonth===mIdx?' active':''}" onclick="selectMonth(${mIdx})">${m}</button>`;
-  }).join('');
-}
-window.selectMonth = function(m){selectedMonth=m;renderMonthSelector();renderMonthly();}
-window.renderMonthly = function(){
-  const mKey='month_'+selectedMonth;
-  const snaps=((window.S.monthlySnapshots||{})[mKey])||[];
-  const mName=MONTHS[selectedMonth-4]||'—';
-  const totalXP=snaps.reduce((s,w)=>s+w.weekXP,0);
-  const avgTemp=snaps.length?Math.round(snaps.reduce((s,w)=>s+w.temp,0)/snaps.length*10)/10:'—';
-  const domainWins=snaps.reduce((s,w)=>s+w.domainWins,0);
-  const slogMonth=window.S.slogEntries.filter(e=>{const d=new Date(e.ts);return d&&d.getMonth()===selectedMonth;}).length;
-  const moneyActions=window.S.moneyLog.filter(e=>{
-    try{const p=e.date.split('.');const d=new Date(+p[2],+p[1]-1,+p[0]);return d.getMonth()===selectedMonth;}catch{return false;}
-  }).length;
-  const el=document.getElementById('monthlyReport');
-  if(!snaps.length&&selectedMonth===new Date().getMonth()){
-    el.innerHTML=`<div class="report-card"><div class="report-title">${mName} 2026</div><div class="report-period">Текущий месяц · данные появятся после первого Sunday Review</div><div class="report-note">Закрывай каждую неделю через Sunday Review — данные будут собираться автоматически.</div></div>`;
-    return;
-  }
-  el.innerHTML=`<div class="report-card">
-    <div class="report-title">${mName} 2026</div>
-    <div class="report-period">${snaps.length} недель записано</div>
-    <div class="report-grid">
-      <div class="report-stat"><div class="report-stat-val" style="color:var(--pink)">${totalXP}</div><div class="report-stat-lbl">XP ЗА МЕСЯЦ</div></div>
-      <div class="report-stat"><div class="report-stat-val" style="color:var(--marriage)">${avgTemp}</div><div class="report-stat-lbl">ТЕМП. БРАКА</div></div>
-      <div class="report-stat"><div class="report-stat-val" style="color:var(--surgery)">${slogMonth}</div><div class="report-stat-lbl">SURGERY LOGS</div></div>
-      <div class="report-stat"><div class="report-stat-val" style="color:var(--money)">${moneyActions}</div><div class="report-stat-lbl">MONEY ACTIONS</div></div>
-      <div class="report-stat"><div class="report-stat-val" style="color:var(--lavender)">${domainWins}</div><div class="report-stat-lbl">DOMAIN WINS</div></div>
-      <div class="report-stat"><div class="report-stat-val" style="color:var(--peach)">${Math.round(window.S.moneyCurrent/200000*100)}%</div><div class="report-stat-lbl">MONEY GOAL</div></div>
-    </div>
-    <div class="sec-title" style="margin:14px 0 8px">— Недели</div>
-    ${snaps.map(w=>`<div class="report-domain-row"><span class="rdomain-name">${w.date}</span><span class="rdomain-val">${w.weekXP} XP · темп ${w.temp}/5 · ${w.domainWins} доменов</span></div>`).join('')}
-    <div class="report-note">Победа месяца: средняя температура брака ≥3.5 · ≥4 money actions · ≥1 surgery log в неделю.</div>
-  </div>`;
-}
-
-// ── BOSSES ──
-window.renderBosses = function(){
-  document.getElementById('quarterBosses').innerHTML=QUARTER_BOSSES.map(b=>{
-    const doneCount=b.conditions.filter((_,i)=>window.S.kcDone[`${b.q}_${i}`]).length;
-    const pct=Math.round(doneCount/b.conditions.length*100);
-    return`<div class="qb ${b.cls}">
-      <div class="qb-tag">${b.q}</div><div class="qb-name">${b.name}</div>
-      <div class="qb-period">${b.period}</div>
-      <div class="qb-hp-bar"><div class="qb-hp-fill" style="width:${100-pct}%"></div></div>
-      <div class="kill-conditions">${b.conditions.map((c,i)=>{
-        const key=`${b.q}_${i}`;const done=!!window.S.kcDone[key];
-        return`<div class="kc${done?' done':''}" onclick="toggleKC('${key}')"><div class="kc-box">${done?'✓':''}</div><span class="kc-txt">${c}</span></div>`;
-      }).join('')}</div>
-      <div class="qb-note">${b.note}</div></div>`;
-  }).join('');
-  updateYearBossHP();
-}
-window.toggleKC = function(key){window.S.kcDone[key]=!window.S.kcDone[key];save({kcDone:window.S.kcDone});renderBosses();}
-window.updateYearBossHP = function(){
-  const total=QUARTER_BOSSES.reduce((s,b)=>s+b.conditions.length,0);
-  const done=Object.values(window.S.kcDone||{}).filter(Boolean).length;
-  const hp=Math.max(0,Math.round((1-done/total)*100));
-  document.getElementById('yearBossHP').style.width=hp+'%';
-  document.getElementById('yearBossHPLbl').textContent=hp+' HP';
-}
-
-// ── FROZEN ──
-window.renderFrozen = function(){
-  document.getElementById('frozenGrid').innerHTML=FROZEN.map(f=>`<div class="frozen-card"><div class="frozen-name">❄ ${f.name}</div><div class="frozen-until">→ ${f.until}</div><div class="frozen-desc">${f.desc}</div></div>`).join('');
-  document.getElementById('influenceSubs').innerHTML=INFLUENCE_SUBS.map(s=>`<div class="isub"><div class="isub-icon">${s.icon}</div><div><div class="isub-name">${s.name}</div><div class="isub-desc">${s.desc}</div></div></div>`).join('');
-}
-
-// ── XP ──
-window.updateXPDisplay = function(){
-  const xp=Math.max(0,window.S.totalXP);
-  document.getElementById('totalXPDisp').textContent=xp;
-  const pct=Math.min(100,Math.round(xp/8000*100));
-  document.getElementById('mainXPBar').style.width=pct+'%';
-  document.getElementById('mainXPPct').textContent=pct+'%';
-  const today=DAILY_QUESTS.filter(q=>window.S.dailyDone[q.id]).reduce((s,q)=>s+q.xp,0);
-  document.getElementById('todayXP').textContent=today;
-  document.getElementById('weekXPDisp').textContent=Math.max(0,window.S.weekXP);
-  document.getElementById('streakDisp').textContent=window.S.streak;
-}
-
-
-
-// ── SURGERY LOG DATA ──
-const SPECIALTIES = [
-  {id:'general', icon:'🔧', name:'Общая хирургия', procs:[
-    'Аппендэктомия (лапароскопия)','Аппендэктомия (открытая)','Холецистэктомия (лапароскопия)',
-    'Холецистэктомия (открытая)','Грыжесечение пахового канала','Грыжесечение пупочной грыжи',
-    'Спленэктомия','Резекция тонкой кишки','Гастростомия','Лапаротомия диагностическая',
-    'Дренирование брюшной полости','Ушивание перфорации','Резекция желудка',
-  ]},
-  {id:'purulent', icon:'🩹', name:'Гнойная хирургия', procs:[
-    'Вскрытие абсцесса','Вскрытие флегмоны','Некрэктомия','ПХО раны',
-    'Вскрытие панариция','Вскрытие паропроктита','Обработка трофической язвы',
-    'Дренирование гнойника','Иссечение свища','Ампутация пальца',
-  ]},
-  {id:'coloproct', icon:'🔵', name:'Колопроктология', procs:[
-    'Геморроидэктомия','Иссечение анальной трещины','Иссечение свища прямой кишки',
-    'Резекция сигмовидной кишки','Правосторонняя гемиколэктомия','Левосторонняя гемиколэктомия',
-    'Передняя резекция прямой кишки','Брюшно-промежностная экстирпация','Операция Гартмана',
-    'Наложение колостомы','Закрытие колостомы','Удаление полипа','Сфинктеропластика',
-  ]},
-  {id:'oncomammo', icon:'🎗', name:'Онкомаммология', procs:[
-    'Секторальная резекция молочной железы','Мастэктомия по Маддену','Мастэктомия радикальная',
-    'Онкопластическая резекция','Биопсия сторожевого лимфоузла','Лимфодиссекция подмышечная',
-    'Удаление фиброаденомы','Энуклеация кисты молочной железы','Установка порт-системы',
-    'Биопсия опухоли','Эксцизионная биопсия лимфоузла',
-  ]},
-];
-
-const ROLES = [
-  {label:'Наблюдала', score:0, desc:'только присутствовала'},
-  {label:'Ассистировала пассивно', score:1, desc:'держала крючки, подавала инструменты'},
-  {label:'Ассистировала активно', score:2, desc:'коагуляция, ушивание, клипирование'},
-  {label:'Выполнила один этап', score:3, desc:'конкретный шаг операции самостоятельно'},
-  {label:'Вела часть операции', score:4, desc:'несколько этапов под супервизией'},
-  {label:'Первый оператор', score:5, desc:'провела операцию под супервизией'},
-];
-
-const IMPROVED_TAGS = [
-  'Вязание узлов','Работа с коагулятором','Троакарная техника','Выделение структур',
-  'Скорость работы','Пространственная ориентация','Коммуникация с командой',
-  'Экономия движений','Гемостаз','Ушивание','Работа в глубине раны','Лапароскопическое мышление',
-];
-
-// Surgery log state
-let slogState = {
-  specialty: null, proc: null, role: null, autonomyScore: null,
-  improvedTags: [],
-};
-
-window.renderSpecialtyBtns = function() {
-  const el = document.getElementById('specialtyBtns');
-  if (!el) return;
-  el.innerHTML = SPECIALTIES.map(s =>
-    `<button class="spec-btn${slogState.specialty===s.id?' sel':''}" onclick="selectSpecialty('${s.id}')">
-      <span class="spec-icon">${s.icon}</span>${s.name}
-    </button>`).join('');
-}
-
-window.selectSpecialty = function(id) {
-  slogState.specialty = id; slogState.proc = null;
-  renderSpecialtyBtns();
-  document.getElementById('procedureStep').style.display = 'block';
-  renderProcGrid();
-  document.getElementById('roleStep').style.display = 'none';
-  document.getElementById('detailsStep').style.display = 'none';
-  updateSummary();
-}
-
-window.renderProcGrid = function() {
-  const spec = SPECIALTIES.find(s => s.id === slogState.specialty);
-  if (!spec) return;
-  const el = document.getElementById('procGrid');
-  // Mark frequent procedures from history
-  const freq = getFrequentProcs();
-  el.innerHTML = spec.procs.map(p =>
-    `<button class="proc-btn${slogState.proc===p?' sel':''}${freq.includes(p)?' frequent':''}" onclick="selectProc('${p.replace(/'/g,"\'")}')">
-      ${freq.includes(p)?'★ ':''}${p}
-    </button>`).join('');
-}
-
-window.getFrequentProcs = function() {
-  if (!window.S.slogEntries || !window.S.slogEntries.length) return [];
-  const counts = {};
-  window.S.slogEntries.forEach(e => { if(e.proc) counts[e.proc] = (counts[e.proc]||0)+1; });
-  return Object.entries(counts).filter(([,v])=>v>=2).map(([k])=>k);
-}
-
-window.selectProc = function(p) {
-  slogState.proc = p;
-  renderProcGrid();
-  document.getElementById('roleStep').style.display = 'block';
-  renderRoleGrid();
-  updateSummary();
-}
-
-window.selectCustomProc = function() {
-  const val = document.getElementById('slog-proc-custom').value.trim();
-  if (!val) return;
-  selectProc(val);
-  document.getElementById('slog-proc-custom').value = '';
-}
-
-window.renderRoleGrid = function() {
-  const el = document.getElementById('roleGrid');
-  if (!el) return;
-  el.innerHTML = ROLES.map(r =>
-    `<button class="role-btn${slogState.role===r.label?' sel':''}" onclick="selectRole('${r.label}',${r.score})">
-      <span>${r.label} <span style="color:var(--muted);font-weight:400">— ${r.desc}</span></span>
-      <span class="role-score">${r.score}/5</span>
-    </button>`).join('');
-}
-
-window.selectRole = function(label, score) {
-  slogState.role = label; slogState.autonomyScore = score;
-  window.S.autonomyScore = score;
-  renderRoleGrid();
-  document.getElementById('detailsStep').style.display = 'block';
-  renderAutonomyBtns(); renderImprovedTags();
-  updateSummary();
-  document.getElementById('slogSummary').style.display = 'block';
-}
-
-window.renderImprovedTags = function() {
-  const el = document.getElementById('improvedTags');
-  if (!el) return;
-  el.innerHTML = IMPROVED_TAGS.map(t =>
-    `<button class="tag-btn${slogState.improvedTags.includes(t)?' sel':''}" onclick="toggleImprovedTag('${t}')">${t}</button>`
-  ).join('');
-}
-
-window.toggleImprovedTag = function(t) {
-  const i = slogState.improvedTags.indexOf(t);
-  if (i>=0) slogState.improvedTags.splice(i,1); else slogState.improvedTags.push(t);
-  renderImprovedTags();
-}
-
-window.updateSummary = function() {
-  const spec = SPECIALTIES.find(s => s.id === slogState.specialty);
-  document.getElementById('sum-specialty').textContent = spec ? spec.name : '—';
-  document.getElementById('sum-proc').textContent = slogState.proc || '—';
-  document.getElementById('sum-role').textContent = slogState.role || '—';
-  document.getElementById('sum-score').textContent = slogState.autonomyScore !== null ? slogState.autonomyScore+'/5' : '—';
-}
-
+window.renderTodayContent = renderTodayContent;
 
 // ── MORNING CHECK-IN ──
+
+// ── MORNING CHECK-IN ──
+
 const MORNING_OPTS = [
   {v:1, emoji:'😴', lbl:'тяжело'},
   {v:2, emoji:'😔', lbl:'слабо'},
@@ -1581,12 +1089,12 @@ window.renderMorningBtns = function(){
     showRecommendation(window.S.morningScore);
   }
 }
-window.setMorning = function(v){
-  window.S.morningScore=v;
-  document.querySelectorAll('.mbtn').forEach((b,i)=>b.classList.toggle('sel',MORNING_OPTS[i].v===v));
-  document.getElementById('morningDoneBadge').style.display='flex';
+window.setMorning = function(key, v){
+  window.DAYS[key] = window.DAYS[key] || {};
+  window.DAYS[key].morningScore = v;
+  window.updateDayData(key, {morningScore: v});
+  renderTodayContent(key, window.DAYS[key]);
   showRecommendation(v);
-  save({morningScore:v});
 }
 window.showRecommendation = function(v){
   const rec=MORNING_RECS[v];
@@ -1631,39 +1139,45 @@ window.renderEveningForm = function(){
   if(vb) vb.innerHTML=[0,1,2,3,4,5].map(n=>
     `<button class="vbtn${window.S.vitality===n?' sel':''}" onclick="setVitality(${n})">${n}</button>`).join('');
 }
-window.setMood = function(i){
-  window.S.todayMood=i;
+window.setMood = function(key, i){
+  window.DAYS[key] = window.DAYS[key] || {};
+  window.DAYS[key].mood = i;
+  window.updateDayData(key, {mood: i});
   document.querySelectorAll('.mood-btn').forEach((b,j)=>b.classList.toggle('sel',j===i));
-  save({todayMood:i});
 }
-window.setVitality = function(n){
-  window.S.vitality=n;
+window.setVitality = function(key, n){
+  window.DAYS[key] = window.DAYS[key] || {};
+  window.DAYS[key].vitality = n;
+  window.updateDayData(key, {vitality: n});
   document.querySelectorAll('#vitBtns .vbtn').forEach((b,i)=>b.classList.toggle('sel',i===n));
-  save({vitality:n});
 }
 window.logDay = function(){
-  const note=document.getElementById('dayNote')?document.getElementById('dayNote').value.trim():'';
-  const mode=getMorningMode();
-  const isProtected=mode==='survival'||mode==='recovery';
-  // streak logic
-  const today=new Date().toDateString();
-  const lastDay=window.S.lastStreakDay;
-  const yesterday=new Date(Date.now()-86400000).toDateString();
-  if(isProtected){
-    // shield: don't break streak, don't increment
-  } else if(lastDay===yesterday){
-    window.S.streak=(window.S.streak||0)+1;
-  } else if(lastDay!==today){
-    window.S.streak=1;
+  const key = window.todayKey();
+  const day = window.DAYS[key] || {};
+  const note = document.getElementById('dayNote') ? document.getElementById('dayNote').value.trim() : '';
+
+  // Streak
+  const todayStr = new Date().toDateString();
+  const lastDay = window.S.lastStreakDay;
+  const yesterday = new Date(Date.now()-86400000).toDateString();
+  if(lastDay === yesterday) {
+    window.S.streak = (window.S.streak||0) + 1;
+  } else if(lastDay !== todayStr) {
+    window.S.streak = 1;
   }
-  window.S.lastStreakDay=today;
-  window.S.totalXP+=50; window.S.weekXP+=50;
-  window.S.todayLogged=true;
-  // save day entry
-  if(!window.S.dayLog)window.S.dayLog=[];
-  window.S.dayLog.unshift({date:today,ts:Date.now(),vitality:window.S.vitality,mood:window.S.todayMood,note,morning:window.S.morningScore,dailyDone:{...window.S.dailyDone}});
-  save({streak:window.S.streak,lastStreakDay:window.S.lastStreakDay,totalXP:window.S.totalXP,weekXP:window.S.weekXP,todayLogged:true,dayLog:window.S.dayLog,vitality:window.S.vitality});
-  renderDayData();
+  window.S.lastStreakDay = todayStr;
+  window.S.totalXP = (window.S.totalXP||0) + 50;
+  window.S.weekXP = (window.S.weekXP||0) + 50;
+
+  // Save day as logged
+  day.logged = true;
+  day.note = note;
+  window.DAYS[key] = day;
+
+  window.updateDayData(key, {logged: true, note: note});
+  window.saveGlobal({streak: window.S.streak, lastStreakDay: window.S.lastStreakDay, totalXP: window.S.totalXP, weekXP: window.S.weekXP});
+
+  renderTodayContent(key, day);
   updateXPDisplay();
 }
 window.getMorningMode = function(){
