@@ -680,6 +680,23 @@ onValue(ref(db, ROOT), (snapshot) => {
   const data = snapshot.val();
   if (data) Object.assign(window.S, data);
   dbReady = true;
+
+  // DAY RESET — runs immediately after Firebase data loads
+  const today = new Date().toDateString();
+  const lastDay = window.S.lastStreakDay;
+  if (lastDay && lastDay !== today) {
+    window.S.todayLogged = false;
+    window.S.dailyDone = {};
+    window.S.morningScore = null;
+    window.S.todayMood = null;
+    update(ref(db, ROOT), {
+      todayLogged: false,
+      dailyDone: {},
+      morningScore: null,
+      todayMood: null,
+    });
+  }
+
   setSyncStatus('connected', 'Синхронизировано');
   document.getElementById('syncUser').textContent = 'bota@firebase';
   renderAll();
