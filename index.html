@@ -875,7 +875,22 @@ function switchTab(id){
   if(id==='monthly') renderMonthly();
 }
 
+function checkDayReset(){
+  const today = new Date().toDateString();
+  const lastDay = window.S.lastStreakDay;
+  // If lastStreakDay is not today — it's a new day, reset daily state
+  if (lastDay && lastDay !== today) {
+    window.S.todayLogged = false;
+    window.S.dailyDone = {};
+    window.S.morningScore = null;
+    window.S.todayMood = null;
+    // Don't reset weekXP or sqDone — those are weekly
+    save({todayLogged:false, dailyDone:{}, morningScore:null, todayMood:null});
+  }
+}
+
 function renderAll(){
+  checkDayReset();
   renderWins(); renderMorningBtns(); renderEveningForm(); renderDailyQuests(); renderSpecialtyBtns();
   renderWeeklyDomains(); renderAutonomyBtns(); renderSlogEntries();
   renderMoneyActions(); renderMoneyProgress(); renderMoneyLog(); renderMoneyBoss();
