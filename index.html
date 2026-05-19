@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>DR. BOTA · Life RPG 2026</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Unbounded:wght@400;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#fdf6f9;--s1:#fff;--border:#f0d6e4;--border2:#e8c4d8;
+  --text:#2d1f2a;--muted:#9b7a8e;--faint:#fae4ef;
+  --pink:#ff6eb4;--pink2:#ff9dd0;--pink3:#ffc4e1;
+  --lav:#b088f9;--lav2:#d4baff;
+  --mint:#5ecfb0;--mint2:#a8edd8;
+  --peach:#ff9472;--gold:#f5a623;--sky:#60c4ff;
+  --red:#ff6b8a;--green:#5ecfb0;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Space Mono',monospace;font-size:13px;padding-bottom:40px}
+.wrap{max-width:960px;margin:0 auto;padding:16px 14px 60px}
+
+.sync-bar{display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--s1);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;font-size:9px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border2);display:inline-block;margin-right:6px;transition:background .3s}
+.dot.ok{background:var(--mint)}.dot.err{background:var(--red)}.dot.loading{background:var(--gold);animation:pulse .8s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.hdr{text-align:center;margin-bottom:20px}
+.hdr-tag{font-size:9px;letter-spacing:4px;color:var(--muted);margin-bottom:8px}
+.hdr h1{font-family:'Unbounded',sans-serif;font-size:clamp(24px,7vw,48px);font-weight:900;
+  background:linear-gradient(135deg,var(--pink),var(--lav),var(--sky));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;line-height:1.1;margin-bottom:6px}
+.hdr-sub{font-size:9px;color:var(--muted);letter-spacing:1px}
+
+.char{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px;display:grid;grid-template-columns:48px 1fr auto;gap:14px;align-items:center;box-shadow:0 2px 10px #ff6eb40a}
+.avatar{width:48px;height:48px;background:linear-gradient(135deg,var(--pink),var(--lav));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.char-name{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;margin-bottom:2px}
+.char-role{font-size:8px;color:var(--muted);line-height:1.5;margin-bottom:7px}
+.xprow{display:flex;align-items:center;gap:7px}
+.xplbl{font-size:8px;color:var(--muted);white-space:nowrap}
+.xpbar{flex:1;height:5px;background:var(--faint);border-radius:3px;overflow:hidden}
+.xpfill{height:100%;background:linear-gradient(90deg,var(--pink),var(--lav));border-radius:3px;transition:width 1s}
+.season-xp{font-family:'Unbounded',sans-serif;font-size:22px;font-weight:900;color:var(--pink);text-align:right}
+.season-lbl{font-size:7px;color:var(--muted);letter-spacing:2px;text-align:right}
+
+.prompt{background:linear-gradient(135deg,var(--pink3),var(--lav2));border-radius:12px;padding:11px 16px;margin-bottom:16px;font-size:10px;font-style:italic;color:var(--text)}
+
+.tabs{display:flex;gap:3px;background:var(--s1);border:1px solid var(--border);border-radius:12px;padding:5px;margin-bottom:18px;flex-wrap:wrap;position:sticky;top:6px;z-index:100;box-shadow:0 2px 8px #ff6eb40a}
+.tab{flex:1;min-width:55px;text-align:center;padding:8px 3px;border-radius:8px;cursor:pointer;font-size:8px;letter-spacing:1px;color:var(--muted);transition:all .2s;-webkit-user-select:none;user-select:none}
+.tab.active{background:linear-gradient(135deg,var(--pink),var(--lav));color:#fff;font-weight:700;box-shadow:0 2px 8px #ff6eb428}
+.page{display:none}.page.active{display:block}
+
+.stitle{font-size:8px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin:18px 0 10px}
+
+.wins{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.wcard{background:var(--s1);border:1px solid var(--border);border-radius:11px;padding:12px;position:relative;overflow:hidden}
+.wcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--wc)}
+.wicon{font-size:16px;margin-bottom:6px}
+.wname{font-family:'Unbounded',sans-serif;font-size:8px;font-weight:700;color:var(--wc);letter-spacing:1px;margin-bottom:3px}
+.wgoal{font-size:8px;color:var(--muted);line-height:1.5}
+
+.date-nav{background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:13px 16px;margin-bottom:13px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 5px #ff6eb406}
+.darrow{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);background:var(--faint);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;-webkit-user-select:none;user-select:none}
+.darrow:hover{border-color:var(--pink);color:var(--pink)}
+.darrow:disabled{opacity:.25;pointer-events:none}
+.date-center{flex:1;text-align:center}
+.date-main{font-family:'Unbounded',sans-serif;font-size:14px;font-weight:700}
+.date-sub{font-size:8px;color:var(--muted);margin-top:2px;letter-spacing:1px}
+
+.ccard{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 6px #ff6eb406}
+.ccard.evening{border-color:var(--lav2);background:linear-gradient(135deg,#fff8fb,#f8f0ff)}
+.ccard-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.ccard-icon{font-size:22px;flex-shrink:0}
+.ccard-title{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:700;margin-bottom:2px}
+.ccard-sub{font-size:8px;color:var(--muted)}
+.done-badge{margin-left:auto;padding:4px 9px;background:var(--mint2);color:#1a6b50;border-radius:6px;font-size:8px;font-weight:700;letter-spacing:1px;flex-shrink:0}
+
+.morning-btns{display:flex;gap:5px}
+.mbtn{flex:1;padding:11px 3px;border-radius:9px;border:2px solid var(--border);background:var(--faint);color:var(--muted);font-size:15px;cursor:pointer;text-align:center;transition:all .2s;-webkit-user-select:none;user-select:none}
+.mbtn span{display:block;font-size:8px;margin-top:3px;color:var(--muted)}
+.mbtn.sel{border-color:var(--pink);background:#fff0f8}
+.mbtn:disabled{opacity:.5;cursor:default}
+.rec-box{margin-top:10px;background:var(--faint);border-radius:9px;padding:11px 13px}
+.rec-mode{font-size:9px;font-weight:700;letter-spacing:2px;margin-bottom:3px}
+.rec-phrase{font-size:9px;color:var(--text);line-height:1.6;font-style:italic}
+
+.dq-list{display:grid;gap:7px;margin-bottom:10px}
+.dq{background:var(--s1);border:2px solid var(--border);border-radius:11px;padding:12px 14px;display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:10px;cursor:pointer;transition:all .2s;-webkit-user-select:none;user-select:none}
+.dq:active{transform:scale(.98)}
+.dq.done{opacity:.4;background:var(--faint)}
+.dq.past{pointer-events:none;opacity:.5}
+.dqcheck{width:22px;height:22px;border:2px solid var(--qc);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;transition:all .2s}
+.dq.done .dqcheck{background:var(--green);border-color:var(--green);color:#fff}
+.dqname{font-size:10px;color:var(--text)}
+.dqmeta{font-size:8px;color:var(--muted);margin-top:1px}
+.dqxp{font-size:9px;color:var(--pink);font-weight:700;white-space:nowrap}
+
+.xp-row{background:linear-gradient(135deg,#fff8fb,#f8f0ff);border:1px solid var(--border);border-radius:11px;padding:13px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center;margin-bottom:12px}
+.xpval{font-family:'Unbounded',sans-serif;font-size:20px;font-weight:700}
+.xplabel{font-size:7px;color:var(--muted);letter-spacing:1px;margin-top:2px}
+
+.elbl{font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:6px;display:block}
+.erow{margin-bottom:12px}
+.vbts{display:flex;gap:5px}
+.vbtn{width:36px;height:36px;border-radius:9px;border:2px solid var(--border);background:var(--faint);color:var(--text);font-size:13px;cursor:pointer;font-weight:700;font-family:'Space Mono',monospace;transition:all .2s;-webkit-user-select:none;user-select:none}
+.vbtn.sel{background:linear-gradient(135deg,var(--pink),var(--lav));border-color:transparent;color:#fff}
+.mbts{display:flex;gap:5px;flex-wrap:wrap}
+.mdbtn{padding:7px 9px;border-radius:8px;border:1px solid var(--border);background:var(--faint);font-size:14px;cursor:pointer;transition:all .2s;-webkit-user-select:none;user-select:none}
+.mdbtn.sel{border-color:var(--pink);background:#fff0f8;transform:scale(1.12)}
+.einput{width:100%;background:var(--faint);border:1px solid var(--border2);border-radius:8px;padding:9px 11px;color:var(--text);font-family:'Space Mono',monospace;font-size:10px;resize:none;outline:none;-webkit-appearance:none}
+.einput:focus{border-color:var(--lav);background:var(--s1)}
+.log-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--lav),var(--pink));border:none;border-radius:10px;color:#fff;font-family:'Unbounded',sans-serif;font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:4px;-webkit-user-select:none;user-select:none}
+.shield-note{font-size:9px;color:var(--lav);padding:9px 12px;background:#f8f0ff;border-radius:8px;display:flex;align-items:center;gap:7px}
+
+.domain-card{background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:15px;margin-bottom:10px}
+.dc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;flex-wrap:wrap;gap:7px}
+.dc-title{display:flex;align-items:center;gap:8px}
+.dc-icon{font-size:18px}
+.dc-name{font-family:'Unbounded',sans-serif;font-size:9px;font-weight:700;letter-spacing:1px}
+.dc-right{display:flex;align-items:center;gap:8px}
+.dc-bar{width:70px;height:4px;background:var(--faint);border-radius:2px;overflow:hidden}
+.dc-fill{height:100%;border-radius:2px;transition:width .4s}
+.dc-pct{font-size:8px;color:var(--muted)}
+.dc-win{font-size:8px;padding:3px 7px;border-radius:5px;font-weight:700}
+.dc-win.achieved{background:var(--mint2);color:#1a6b50}
+.dc-win.pending{background:var(--faint);color:var(--muted)}
+.sq-list{display:grid;gap:5px}
+.sq{background:var(--faint);border-radius:8px;padding:8px 11px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:all .2s;border:1px solid transparent;-webkit-user-select:none;user-select:none}
+.sq:active{transform:scale(.98)}
+.sq.done{opacity:.45}
+.sqcheck{width:17px;height:17px;border-radius:4px;border:2px solid var(--sqc);display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;transition:all .2s}
+.sq.done .sqcheck{background:var(--green);border-color:var(--green);color:#fff}
+.sq-text{font-size:8px;color:var(--text);flex:1;line-height:1.4}
+.sq-xp{font-size:7px;color:var(--pink);font-weight:700}
+
+.slog{background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:16px}
+.slbl{font-size:8px;color:var(--muted);letter-spacing:2px;margin-bottom:5px;display:block}
+.srow{margin-bottom:11px}
+.spec-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.spec-btn{padding:11px 7px;border-radius:9px;border:2px solid var(--border);background:var(--faint);color:var(--text);font-size:8px;cursor:pointer;text-align:center;transition:all .2s;font-family:'Space Mono',monospace;-webkit-user-select:none;user-select:none;line-height:1.4}
+.spec-btn .si{font-size:16px;display:block;margin-bottom:3px}
+.spec-btn.sel{border-color:var(--sky);background:#f0f9ff}
+.proc-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;max-height:200px;overflow-y:auto;margin-top:6px}
+.proc-btn{padding:8px 7px;border-radius:7px;border:1px solid var(--border);background:var(--faint);color:var(--muted);font-size:8px;cursor:pointer;text-align:left;transition:all .2s;font-family:'Space Mono',monospace;-webkit-user-select:none;user-select:none;line-height:1.4}
+.proc-btn.sel{border-color:var(--sky);background:#e8f7ff;color:var(--text);font-weight:700}
+.proc-btn.freq{border-color:var(--pink2);background:#fff0f8}
+.role-grid{display:grid;gap:5px;margin-top:6px}
+.role-btn{padding:9px 12px;border-radius:8px;border:2px solid var(--border);background:var(--faint);color:var(--text);font-size:8px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:all .2s;font-family:'Space Mono',monospace;-webkit-user-select:none;user-select:none}
+.role-btn.sel{border-color:var(--sky);background:#e8f7ff;font-weight:700}
+.role-score{font-size:7px;padding:2px 6px;background:var(--border);border-radius:3px;color:var(--muted)}
+.role-btn.sel .role-score{background:var(--sky);color:#fff}
+.auto-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.abtn{flex:1;min-width:44px;padding:8px 3px;border-radius:7px;border:2px solid var(--border);background:var(--faint);color:var(--muted);font-size:8px;cursor:pointer;text-align:center;transition:all .2s;font-family:'Space Mono',monospace;-webkit-user-select:none;user-select:none;line-height:1.3}
+.abtn.sel{background:var(--sky);border-color:var(--sky);color:#fff;font-weight:700}
+.tag-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tag{padding:4px 9px;border-radius:5px;border:1px solid var(--border);background:var(--faint);color:var(--muted);font-size:8px;cursor:pointer;transition:all .2s;-webkit-user-select:none;user-select:none}
+.tag.sel{background:var(--lav2);border-color:var(--lav);color:var(--text);font-weight:700}
+.slog-actions{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+.save-btn{flex:1;min-width:130px;padding:11px;background:linear-gradient(135deg,var(--sky),var(--lav));border:none;border-radius:9px;color:#fff;font-family:'Unbounded',sans-serif;font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer}
+.sheets-btn{padding:11px 13px;background:var(--faint);border:1px solid var(--border2);border-radius:9px;color:var(--muted);font-family:'Space Mono',monospace;font-size:8px;cursor:pointer;transition:all .2s}
+.sheets-btn.syncing{color:var(--gold);border-color:var(--gold)}
+.sheets-btn.ok{color:var(--mint);border-color:var(--mint)}
+.sentry{background:var(--faint);border-radius:9px;padding:10px 12px;font-size:8px;color:var(--muted);line-height:1.7;border-left:3px solid var(--sky);margin-bottom:7px}
+.eproc{color:var(--sky);font-weight:700;font-size:9px;margin-bottom:2px}
+.escore{background:var(--sky);color:#fff;padding:2px 6px;border-radius:3px;font-size:7px;font-weight:700}
+.emeta{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:4px}
+
+.money-card{background:var(--s1);border:1px solid var(--border);border-top:3px solid var(--mint);border-radius:13px;padding:16px;margin-bottom:10px}
+.money-big{font-family:'Unbounded',sans-serif;font-size:19px;font-weight:900;color:var(--mint);margin-bottom:3px}
+.money-sub-txt{font-size:8px;color:var(--muted);letter-spacing:1px;margin-bottom:12px}
+.minput-row{display:flex;gap:7px;align-items:center;margin-bottom:10px}
+.minput{flex:1;background:var(--faint);border:1px solid var(--border2);border-radius:7px;padding:9px 10px;color:var(--text);font-family:'Space Mono',monospace;font-size:13px;font-weight:700;outline:none;-webkit-appearance:none}
+.minput:focus{border-color:var(--mint)}
+.msetbtn{padding:9px 12px;background:var(--mint);border:none;border-radius:7px;color:#fff;font-family:'Space Mono',monospace;font-size:9px;cursor:pointer;font-weight:700}
+.mbar{height:9px;background:var(--faint);border-radius:5px;overflow:hidden;margin-bottom:5px}
+.mbar-fill{height:100%;background:linear-gradient(90deg,var(--mint),var(--mint2));border-radius:5px;transition:width 1s}
+.mbar-lbl{font-size:8px;color:var(--muted);display:flex;justify-content:space-between}
+.action-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:9px}
+.actbtn{background:var(--faint);border:1px solid var(--border);border-radius:7px;padding:9px 7px;font-size:8px;color:var(--muted);cursor:pointer;text-align:center;transition:all .2s;font-family:'Space Mono',monospace;line-height:1.4;-webkit-user-select:none;user-select:none}
+.actbtn.sel{background:linear-gradient(135deg,var(--mint),var(--mint2));border-color:var(--mint);color:#fff;font-weight:700}
+.mentry{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:8px}
+.mentry:last-child{border-bottom:none}
+.metype{color:var(--mint);font-weight:700}
+.medate{color:var(--muted)}
+.boss-card{background:linear-gradient(135deg,#f0fff8,#e8f5f0);border:1px solid #5ecfb044;border-radius:12px;padding:15px;margin-bottom:10px}
+.boss-tag{font-size:7px;letter-spacing:3px;color:var(--mint);margin-bottom:5px}
+.boss-name{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;margin-bottom:7px}
+.bhpbar{height:7px;background:var(--faint);border-radius:4px;overflow:hidden;margin-bottom:7px}
+.bhpfill{height:100%;background:linear-gradient(90deg,var(--red),#ffb3c1);border-radius:4px;transition:width .8s}
+.bc{display:flex;gap:7px;font-size:8px;color:var(--muted);align-items:flex-start;cursor:pointer;padding:5px 0;line-height:1.5;-webkit-user-select:none;user-select:none}
+.bc-box{width:15px;height:15px;border-radius:4px;border:1px solid var(--border2);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:8px;transition:all .2s}
+.bc.done .bc-box{background:var(--mint);border-color:var(--mint);color:#fff}
+.bc.done .bc-txt{text-decoration:line-through;opacity:.5}
+
+.sun-card{background:linear-gradient(135deg,#fff8fb,#f5f0ff);border:1px solid var(--border2);border-radius:15px;padding:18px;box-shadow:0 2px 12px #ff6eb410}
+.sun-title{font-family:'Unbounded',sans-serif;font-size:15px;font-weight:900;margin-bottom:3px;background:linear-gradient(135deg,var(--pink),var(--lav));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sun-sub{font-size:8px;color:var(--muted);margin-bottom:16px;letter-spacing:1px}
+.sun-section{margin-bottom:16px}
+.sun-lbl{font-size:8px;letter-spacing:2px;color:var(--muted);display:block;margin-bottom:8px}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px}
+.stat-box{background:var(--s1);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center}
+.stat-val{font-family:'Unbounded',sans-serif;font-size:17px;font-weight:700}
+.stat-lbl{font-size:7px;color:var(--muted);letter-spacing:1px;margin-top:2px}
+.temp-btns{display:flex;gap:5px;flex-wrap:wrap}
+.tbtn{flex:1;min-width:38px;padding:11px 3px;border-radius:9px;border:2px solid var(--border);background:var(--faint);color:var(--muted);font-size:13px;cursor:pointer;text-align:center;font-weight:700;font-family:'Space Mono',monospace;transition:all .2s;-webkit-user-select:none;user-select:none}
+.tbtn.sel{background:linear-gradient(135deg,var(--pink),var(--pink2));border-color:var(--pink);color:#fff}
+.tdesc{font-size:8px;color:var(--muted);margin-top:6px;font-style:italic;min-height:14px}
+.thist{display:flex;gap:3px;align-items:flex-end;height:44px;margin-top:8px}
+.tbar{flex:1;border-radius:3px 3px 0 0;background:linear-gradient(to top,var(--pink),var(--pink3));min-height:3px;transition:height .4s}
+.domain-wins{display:grid;gap:5px}
+.dwin{display:flex;align-items:center;gap:7px;padding:6px 9px;background:var(--s1);border:1px solid var(--border);border-radius:7px;font-size:8px;color:var(--muted)}
+.dwin.ok{background:#5ecfb012;border-color:var(--mint);color:var(--text)}
+.dwin-dot{width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0}
+.dwin.ok .dwin-dot{background:var(--mint)}
+.close-week-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--pink),var(--lav));border:none;border-radius:10px;color:#fff;font-family:'Unbounded',sans-serif;font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;margin-top:10px}
+
+.report-card{background:var(--s1);border:1px solid var(--border);border-radius:13px;padding:16px;margin-bottom:10px}
+.report-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:7px;margin-bottom:12px}
+.rstat{background:var(--faint);border-radius:9px;padding:11px;text-align:center}
+.rval{font-family:'Unbounded',sans-serif;font-size:18px;font-weight:700}
+.rlbl{font-size:7px;color:var(--muted);letter-spacing:1px;margin-top:2px}
+.msel{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.msel-btn{padding:5px 11px;border-radius:7px;border:1px solid var(--border);background:var(--faint);color:var(--muted);font-size:8px;cursor:pointer;font-family:'Space Mono',monospace;-webkit-user-select:none;user-select:none}
+.msel-btn.active{background:linear-gradient(135deg,var(--pink),var(--lav));color:#fff;border-color:transparent}
+
+.yboss{background:linear-gradient(135deg,#fff0f6,#f5f0ff);border:2px solid var(--pink3);border-radius:15px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden}
+.yboss::after{content:'✦';position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:54px;color:var(--pink3);pointer-events:none}
+.yb-tag{font-size:7px;letter-spacing:4px;color:var(--pink);margin-bottom:7px}
+.yb-name{font-family:'Unbounded',sans-serif;font-size:17px;font-weight:900;margin-bottom:7px}
+.yhprow{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.yhpbar{flex:1;height:8px;background:var(--faint);border-radius:4px;overflow:hidden}
+.yhpfill{height:100%;background:linear-gradient(90deg,var(--red),var(--peach));border-radius:4px;transition:width 1s}
+.yhplbl{font-size:8px;color:var(--red);white-space:nowrap;font-weight:700}
+.yb-desc{font-size:8px;color:var(--muted);line-height:1.7}
+.qb{border-radius:13px;padding:16px;border:1px solid;margin-bottom:10px}
+.qb-q2{background:linear-gradient(135deg,#fffbf0,#fff8e8);border-color:#f5a62340}
+.qb-q3{background:linear-gradient(135deg,#f0f8ff,#e8f5ff);border-color:#60c4ff40}
+.qb-q4{background:linear-gradient(135deg,#fff0f4,#ffe8ee);border-color:#ff6eb440}
+.qb-tag{font-size:7px;letter-spacing:3px;margin-bottom:4px;font-weight:700}
+.qb-q2 .qb-tag{color:var(--gold)}.qb-q3 .qb-tag{color:var(--sky)}.qb-q4 .qb-tag{color:var(--pink)}
+.qb-name{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;margin-bottom:3px}
+.qb-period{font-size:7px;color:var(--muted);margin-bottom:8px;letter-spacing:1px}
+.qbhpbar{height:4px;background:var(--faint);border-radius:3px;overflow:hidden;margin-bottom:10px}
+.qbhpfill{height:100%;border-radius:3px;transition:width .8s}
+.qb-q2 .qbhpfill{background:var(--gold)}.qb-q3 .qbhpfill{background:var(--sky)}.qb-q4 .qbhpfill{background:var(--pink)}
+.kc{display:flex;gap:6px;font-size:8px;color:var(--muted);line-height:1.5;align-items:flex-start;cursor:pointer;padding:5px 6px;border-radius:6px;transition:background .15s;-webkit-user-select:none;user-select:none}
+.kc:hover{background:var(--faint)}
+.kc-box{width:14px;height:14px;border-radius:3px;border:1px solid var(--border2);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:8px;transition:all .2s}
+.kc.done .kc-box{background:var(--mint);border-color:var(--mint);color:#fff}
+.kc.done .kc-txt{text-decoration:line-through;opacity:.5}
+.qb-note{font-size:7px;color:var(--muted);font-style:italic;margin-top:8px;padding-top:7px;border-top:1px solid var(--border);line-height:1.6}
+
+.frozen-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:10px}
+.fcard{background:var(--faint);border:1px dashed var(--border2);border-radius:9px;padding:12px;opacity:.6}
+.fname{font-size:9px;color:var(--muted);font-weight:700;margin-bottom:2px}
+.funtil{font-size:7px;letter-spacing:2px;color:var(--lav2)}
+.fdesc{font-size:8px;color:var(--muted);margin-top:3px;line-height:1.5}
+.isub{background:var(--s1);border:1px solid var(--border);border-left:3px solid var(--lav);border-radius:9px;padding:10px 13px;display:flex;gap:9px;align-items:flex-start;margin-bottom:7px}
+.iicon{font-size:14px;flex-shrink:0;margin-top:1px}
+.iname{font-size:9px;color:var(--lav);font-weight:700;margin-bottom:2px}
+.idesc{font-size:8px;color:var(--muted);line-height:1.5}
+
+.divider{height:1px;background:var(--border);margin:14px 0}
+.note{font-size:8px;color:var(--muted);line-height:1.7;font-style:italic}
+.primary-btn{padding:10px 14px;background:linear-gradient(135deg,var(--pink),var(--lav));border:none;border-radius:8px;color:#fff;font-family:'Unbounded',sans-serif;font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;width:100%;margin-top:8px}
+
+@media(max-width:500px){
+  .char{grid-template-columns:42px 1fr}.season-xp,.season-lbl{display:none}
+  .wins{grid-template-columns:1fr 1fr}
+  .xp-row,.stats-row{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="sync-bar">
+  <div><span class="dot loading" id="syncDot"></span><span id="syncLabel">Загрузка...</span></div>
+  <span style="font-size:8px;color:var(--muted)" id="syncUser"></span>
+</div>
+
+<div class="hdr">
+  <div class="hdr-tag">Life RPG · Season 2026 · v5.0</div>
+  <h1>DR. BOTA</h1>
+  <div class="hdr-sub">May 18 → Dec 31, 2026 · <span id="daysLeft">—</span> days</div>
+</div>
+
+<div class="char">
+  <div class="avatar">⚔️</div>
+  <div>
+    <div class="char-name">Каукенова Ботагоз</div>
+    <div class="char-role">Surgery Resident · CEO Medsupportkz · @dr.kaukenova</div>
+    <div class="xprow">
+      <span class="xplbl">SEASON XP</span>
+      <div class="xpbar"><div class="xpfill" id="xpBar" style="width:0%"></div></div>
+      <span class="xplbl" id="xpPct">0%</span>
+    </div>
+  </div>
+  <div><div class="season-xp" id="totalXP">0</div><div class="season-lbl">XP</div></div>
+</div>
+
+<div class="prompt">✦ Did you strengthen your body, money, marriage, or direction today?</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="tab('today')">TODAY</div>
+  <div class="tab" onclick="tab('weekly')">WEEKLY</div>
+  <div class="tab" onclick="tab('surgery')">SURGERY</div>
+  <div class="tab" onclick="tab('money')">MONEY</div>
+  <div class="tab" onclick="tab('sunday')">SUNDAY</div>
+  <div class="tab" onclick="tab('monthly')">MONTHLY</div>
+  <div class="tab" onclick="tab('bosses')">BOSSES</div>
+  <div class="tab" onclick="tab('frozen')">FROZEN</div>
+</div>
+
+<!-- TODAY -->
+<div class="page active" id="page-today">
+  <div class="stitle">— 5 Win Conditions · 2026</div>
+  <div class="wins" id="winsGrid"></div>
+  <div class="divider"></div>
+
+  <div class="date-nav">
+    <button class="darrow" id="prevBtn" onclick="shiftDay(-1)">‹</button>
+    <div class="date-center">
+      <div class="date-main" id="dateMain">...</div>
+      <div class="date-sub" id="dateSub">...</div>
+    </div>
+    <button class="darrow" id="nextBtn" onclick="shiftDay(1)" disabled>›</button>
+  </div>
+
+  <div class="ccard" id="morningCard">
+    <div class="ccard-header">
+      <span class="ccard-icon">☀️</span>
+      <div><div class="ccard-title">Утренний чек-ин</div><div class="ccard-sub">Как ты себя чувствуешь прямо сейчас?</div></div>
+      <div class="done-badge" id="morningBadge" style="display:none">✓ done</div>
+    </div>
+    <div class="morning-btns" id="morningBtns"></div>
+    <div class="rec-box" id="recBox" style="display:none">
+      <div class="rec-mode" id="recMode"></div>
+      <div class="rec-phrase" id="recPhrase"></div>
+    </div>
+  </div>
+
+  <div class="stitle">— Квесты дня</div>
+  <div class="dq-list" id="dqList"></div>
+
+  <div class="xp-row">
+    <div><div class="xpval" id="todayXPVal" style="color:var(--pink)">0</div><div class="xplabel">XP СЕГОДНЯ</div></div>
+    <div><div class="xpval" id="weekXPVal" style="color:var(--lav)">0</div><div class="xplabel">XP НЕДЕЛЯ</div></div>
+    <div><div class="xpval" id="streakVal" style="color:var(--gold)">0</div><div class="xplabel">STREAK 🔥</div></div>
+  </div>
+
+  <div class="ccard evening" id="eveningCard">
+    <div class="ccard-header">
+      <span class="ccard-icon">🌙</span>
+      <div><div class="ccard-title">Log Day · вечерний итог</div><div class="ccard-sub" id="eveningSub">Выполни хотя бы 1 квест</div></div>
+      <div class="done-badge" id="eveningBadge" style="display:none">✓ logged</div>
+    </div>
+    <div id="eveningForm" style="display:none">
+      <div class="erow"><span class="elbl">VITALITY — как прошёл день (0–5)</span><div class="vbts" id="vitBtns"></div></div>
+      <div class="erow"><span class="elbl">НАСТРОЕНИЕ</span><div class="mbts" id="moodBtns"></div></div>
+      <div class="erow"><span class="elbl">ЗАМЕТКА ДНЯ</span><textarea class="einput" id="dayNote" rows="2" placeholder="одна мысль о дне..."></textarea></div>
+      <button class="log-btn" onclick="logDay()">✦ LOG DAY +50 XP</button>
+    </div>
+    <div class="shield-note" id="shieldNote" style="display:none">🛡 Survival/Recovery день — streak защищён.</div>
+  </div>
+</div>
+
+<!-- WEEKLY -->
+<div class="page" id="page-weekly">
+  <div class="stitle">— Еженедельный прогресс</div>
+  <div class="note" style="margin-bottom:12px">Отмечай что делаешь → при ≥50% домен засчитан ✓</div>
+  <div id="weeklyDomains"></div>
+</div>
+
+<!-- SURGERY -->
+<div class="page" id="page-surgery">
+  <div class="stitle">— Surgical Autonomy Log</div>
+  <div class="slog">
+    <div class="srow"><span class="slbl">1 · РАЗДЕЛ ХИРУРГИИ</span><div class="spec-grid" id="specGrid"></div></div>
+    <div class="srow" id="procRow" style="display:none"><span class="slbl">2 · ОПЕРАЦИЯ</span><div class="proc-grid" id="procGrid"></div><div style="display:flex;gap:6px;margin-top:6px"><input class="einput" id="customProc" placeholder="или введи вручную..." style="flex:1"><button onclick="addCustomProc()" style="padding:0 12px;background:var(--sky);border:none;border-radius:7px;color:#fff;cursor:pointer;font-size:14px">+</button></div></div>
+    <div class="srow" id="roleRow" style="display:none"><span class="slbl">3 · МОЯ РОЛЬ</span><div class="role-grid" id="roleGrid"></div></div>
+    <div class="srow" id="detailRow" style="display:none">
+      <span class="slbl">4 · AUTONOMY SCORE</span><div class="auto-btns" id="autoBtns"></div>
+      <div style="margin-top:12px"><span class="slbl">ЧТО УЛУЧШИЛОСЬ</span><div class="tag-row" id="tagRow"></div><textarea class="einput" id="improvedNote" rows="2" placeholder="или напиши..." style="margin-top:6px"></textarea></div>
+      <div style="margin-top:10px"><span class="slbl">ЧТО СПРОСИТЬ В СЛЕДУЮЩИЙ РАЗ</span><input class="einput" id="nextQ" placeholder="один конкретный вопрос" autocomplete="off"></div>
+    </div>
+    <div class="slog-actions">
+      <button class="save-btn" onclick="saveLog()">СОХРАНИТЬ +120 XP</button>
+      <button class="sheets-btn" id="sheetsBtn" onclick="syncSheets()">📊 SYNC TO SHEETS</button>
+    </div>
+  </div>
+  <div class="stitle">— История</div>
+  <div id="slogList"></div>
+</div>
+
+<!-- MONEY -->
+<div class="page" id="page-money">
+  <div class="stitle">— Money Arc</div>
+  <div class="money-card">
+    <div class="money-big">+200 000 KZT/мес</div>
+    <div class="money-sub-txt">регулярный дополнительный доход</div>
+    <div class="minput-row"><input class="minput" id="moneyInput" type="number" inputmode="numeric" placeholder="текущий доп. доход KZT/мес"><button class="msetbtn" onclick="setMoney()">OK</button></div>
+    <div class="mbar"><div class="mbar-fill" id="moneyBar" style="width:0%"></div></div>
+    <div class="mbar-lbl"><span id="moneyLbl">0 KZT/мес</span><span>цель: 200 000</span></div>
+  </div>
+  <div class="money-card">
+    <div class="stitle" style="margin:0 0 6px">— Тип действия этой недели</div>
+    <div class="note">Одно действие в неделю.</div>
+    <div class="action-grid" id="actionGrid"></div>
+    <button class="primary-btn" onclick="logAction()">ЗАЛОГИРОВАТЬ +160 XP</button>
+  </div>
+  <div class="money-card">
+    <div class="stitle" style="margin:0 0 8px">— Лог действий</div>
+    <div id="moneyLog"><div class="note">Нет записей.</div></div>
+  </div>
+  <div class="boss-card">
+    <div class="boss-tag">⚔ MONTHLY BOSS</div>
+    <div class="boss-name">Unclear Income Path</div>
+    <div class="bhpbar"><div class="bhpfill" id="mbossHP" style="width:100%"></div></div>
+    <div id="mbossConds"></div>
+  </div>
+</div>
+
+<!-- SUNDAY -->
+<div class="page" id="page-sunday">
+  <div class="stitle">— Sunday Review</div>
+  <div class="sun-card">
+    <div class="sun-title">Sunday Review</div>
+    <div class="sun-sub">5 минут · закрыть неделю</div>
+    <div class="sun-section">
+      <span class="sun-lbl">XP ИТОГ НЕДЕЛИ</span>
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-val" id="sr-xp" style="color:var(--pink)">0</div><div class="stat-lbl">WEEK XP</div></div>
+        <div class="stat-box"><div class="stat-val" id="sr-daily" style="color:var(--lav)">0/5</div><div class="stat-lbl">DAILY</div></div>
+        <div class="stat-box"><div class="stat-val" id="sr-domains" style="color:var(--mint)">0/5</div><div class="stat-lbl">DOMAINS</div></div>
+      </div>
+    </div>
+    <div class="sun-section">
+      <span class="sun-lbl">ДОМЕНЫ</span>
+      <div class="domain-wins" id="sr-domains-list"></div>
+    </div>
+    <div class="sun-section">
+      <span class="sun-lbl">MARRIAGE TEMPERATURE · эта неделя</span>
+      <div class="temp-btns" id="tempBtns"></div>
+      <div class="tdesc" id="tempDesc"></div>
+      <div style="margin-top:10px"><span class="sun-lbl">ИСТОРИЯ</span><div class="thist" id="tempHist"></div></div>
+    </div>
+    <div class="sun-section">
+      <span class="sun-lbl">VITALITY НА СЛЕДУЮЩУЮ НЕДЕЛЮ</span>
+      <div class="vbts" id="sr-vit"></div>
+    </div>
+    <button class="close-week-btn" onclick="closeWeek()">✦ ЗАКРЫТЬ НЕДЕЛЮ</button>
+  </div>
+</div>
+
+<!-- MONTHLY -->
+<div class="page" id="page-monthly">
+  <div class="stitle">— Monthly Report</div>
+  <div class="msel" id="monthSel"></div>
+  <div id="monthReport"></div>
+</div>
+
+<!-- BOSSES -->
+<div class="page" id="page-bosses">
+  <div class="stitle">— Year Boss</div>
+  <div class="yboss">
+    <div class="yb-tag">★ YEAR BOSS · 2026</div>
+    <div class="yb-name">Scattered Potential</div>
+    <div class="yhprow"><div class="yhpbar"><div class="yhpfill" id="ybHP" style="width:100%"></div></div><span class="yhplbl" id="ybHPlbl">100 HP</span></div>
+    <div class="yb-desc">Победа: сильное тело, деньги, тёплый брак, хирургическая автономия, международная видимость.</div>
+  </div>
+  <div class="stitle">— Quarter Bosses</div>
+  <div class="note" style="margin-bottom:10px">Kill conditions отмечаешь сама — это milestone-суждения.</div>
+  <div id="qBosses"></div>
+</div>
+
+<!-- FROZEN -->
+<div class="page" id="page-frozen">
+  <div class="stitle">— Frozen Until 2027</div>
+  <div class="note">В зимней спячке. Никаких еженедельных квестов.</div>
+  <div class="frozen-grid" id="frozenGrid"></div>
+  <div class="stitle">— Influence · поддомены</div>
+  <div id="influenceSubs"></div>
+</div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+// FIREBASE INIT — graceful fallback to localStorage
+// ══════════════════════════════════════════════
+var db = null;
+var ROOT = 'bota_rpg_v5';
+var SHEETS_URL = 'https://script.google.com/macros/s/AKfycbywbdkhr_IQSwX1dh31-s2lUg-Rw_hwqLqeRAlsTYBBXch0HuxrrzYrQaofBf2b1vzp/exec';
+
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp({
+      apiKey: "AIzaSyBvJdwve4vp4uJ9k_7d-O79PXAAQ2MsiBw",
+      authDomain: "bota-life-rpg.firebaseapp.com",
+      databaseURL: "https://bota-life-rpg-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "bota-life-rpg",
+      storageBucket: "bota-life-rpg.firebasestorage.app",
+      messagingSenderId: "1060902699929",
+      appId: "1:1060902699929:web:e52126117bdb49c5a40908"
+    });
+    db = firebase.database();
+  }
+} catch(e) {
+  console.warn('Firebase unavailable, using localStorage only');
+}
+
+// ══════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════
+var G = {
+  totalXP:0, weekXP:0, streak:0, lastStreakDay:null,
+  sqDone:{}, tempHistory:[], tempScore:null, srVit:null,
+  moneyCurrent:0, moneyAction:null, moneyLog:[], moneyBossDone:{},
+  slogEntries:[], kcDone:{}, monthlySnaps:{},
+};
+var DAYS = {};
+var viewDate = new Date();
+viewDate.setHours(0,0,0,0);
+var SL = {specialty:null, proc:null, role:null, score:null, tags:[]};
+
+// ══════════════════════════════════════════════
+// DATE HELPERS
+// ══════════════════════════════════════════════
+function dateKey(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function todayKey() { return dateKey(new Date()); }
+function isViewToday() { return dateKey(viewDate) === todayKey(); }
+function daysLeft() {
+  return Math.max(0, Math.ceil((new Date('2026-12-31') - new Date()) / 86400000));
+}
+
+// ══════════════════════════════════════════════
+// STORAGE
+// ══════════════════════════════════════════════
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)||'null'); } catch(e) { return null; } }
+function lsSet(k,v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+
+function syncStatus(cls, txt) {
+  var d = document.getElementById('syncDot');
+  var l = document.getElementById('syncLabel');
+  if (d) d.className = 'dot '+cls;
+  if (l) l.textContent = txt;
+}
+
+function saveG(partial) {
+  Object.assign(G, partial);
+  lsSet('brpg_g', G);
+  if (db) {
+    try { db.ref(ROOT+'/global').update(partial); } catch(e) {}
+  }
+}
+
+function saveDay(key, partial) {
+  DAYS[key] = Object.assign(DAYS[key]||{}, partial);
+  lsSet('brpg_d_'+key, DAYS[key]);
+  if (db) {
+    try { db.ref(ROOT+'/days/'+key).update(partial); } catch(e) {}
+  }
+  syncStatus('ok','✓ Сохранено');
+}
+
+// ══════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════
+function boot() {
+  // Load from localStorage immediately — no blank screen
+  var lsG = lsGet('brpg_g');
+  if (lsG) Object.assign(G, lsG);
+  var tk = todayKey();
+  var lsD = lsGet('brpg_d_'+tk);
+  if (lsD) DAYS[tk] = lsD;
+
+  renderAll();
+  renderDay(tk);
+
+  if (db) {
+    syncStatus('loading','Подключение...');
+    db.ref(ROOT+'/global').once('value', function(snap) {
+      var data = snap.val() || {};
+      Object.assign(G, data);
+      lsSet('brpg_g', G);
+      db.ref(ROOT+'/days/'+tk).once('value', function(ds) {
+        var fd = ds.val() || {};
+        DAYS[tk] = Object.assign(DAYS[tk]||{}, fd);
+        lsSet('brpg_d_'+tk, DAYS[tk]);
+        syncStatus('ok','✓ Синхронизировано');
+        document.getElementById('syncUser').textContent = 'bota · firebase';
+        renderAll();
+        renderDay(tk);
+      });
+    }, function() {
+      syncStatus('err','Firebase недоступен · данные локальные');
+    });
+  } else {
+    syncStatus('ok','✓ Локальное хранилище');
+    document.getElementById('syncUser').textContent = 'bota · local';
+  }
+
+  startMidnightWatch();
+}
+
+// ══════════════════════════════════════════════
+// MIDNIGHT AUTO-REFRESH
+// ══════════════════════════════════════════════
+var watchedDay = todayKey();
+
+function startMidnightWatch() {
+  setInterval(function() {
+    var current = todayKey();
+    if (current === watchedDay) return;
+    // New day crossed midnight
+    watchedDay = current;
+    viewDate = new Date();
+    viewDate.setHours(0,0,0,0);
+    if (!DAYS[current]) {
+      if (db) {
+        db.ref(ROOT+'/days/'+current).once('value', function(s) {
+          DAYS[current] = s.val() || {};
+          lsSet('brpg_d_'+current, DAYS[current]);
+          renderAll(); renderDay(current);
+        });
+      } else {
+        DAYS[current] = lsGet('brpg_d_'+current) || {};
+        renderAll(); renderDay(current);
+      }
+    } else {
+      renderAll(); renderDay(current);
+    }
+  }, 30000); // check every 30s — lightweight, no network call until midnight actually crosses
+}
+
+// ══════════════════════════════════════════════
+// DATA CONSTANTS
+// ══════════════════════════════════════════════
+var WINS = [
+  {icon:'💪',name:'BODY',goal:'−7 кг + рельеф',color:'var(--peach)'},
+  {icon:'💰',name:'MONEY',goal:'+200 000 KZT/мес',color:'var(--mint)'},
+  {icon:'🌸',name:'MARRIAGE',goal:'Тепло · команда',color:'var(--pink)'},
+  {icon:'🔪',name:'SURGERY',goal:'Максимальная автономия',color:'var(--sky)'},
+  {icon:'🌍',name:'INTERNATIONAL',goal:'Представить Казахстан',color:'var(--lav)'},
+];
+var DQ = [
+  {id:'protein',name:'Protein target',meta:'Дневная норма белка',xp:40,color:'var(--peach)'},
+  {id:'movement',name:'Movement dose',meta:'20–30 мин ходьба или тренировка',xp:45,color:'var(--peach)'},
+  {id:'reading',name:'10 мин стратегическое чтение',meta:'Хирургия / политика / деньги',xp:35,color:'var(--lav)'},
+  {id:'marriage',name:'Marriage micro-connection',meta:'Объятие · сообщение · чай · разговор',xp:30,color:'var(--pink)'},
+  {id:'reset',name:'Reset Protocol',meta:'Душ · уход · 5 мин уборка · план завтра',xp:25,color:'var(--lav)'},
+];
+var MORNING = [
+  {v:1,e:'😴',l:'тяжело'},{v:2,e:'😔',l:'слабо'},{v:3,e:'😐',l:'норм'},
+  {v:4,e:'🙂',l:'хорошо'},{v:5,e:'✨',l:'отлично'},
+];
+var MREC = {
+  1:{mode:'SURVIVAL MODE',color:'var(--red)',phrase:'Сегодня одна задача — дойти до вечера. Reset Protocol и ты молодец.'},
+  2:{mode:'RECOVERY MODE',color:'var(--lav)',phrase:'Береги себя. Белок и одно тёплое действие для Алишера — этого достаточно.'},
+  3:{mode:'LOW BATTERY',color:'var(--gold)',phrase:'Базовый день. Движение + чтение + брак. Без геройства.'},
+  4:{mode:'NORMAL MODE',color:'var(--mint)',phrase:'Хороший день. Сделай одно стратегическое действие сверх базового.'},
+  5:{mode:'FULL POWER ✦',color:'var(--pink)',phrase:'Используй энергию. Операция, заявка, или качественное время с Алишером.'},
+};
+var MOODS = ['😤','😔','😐','🙂','😊','🥰'];
+var TDESC = ['просто сосуществуем','много раздражения','контакт поверхностный','нормальная неделя','близость и поддержка','✦ мы — команда'];
+var WD = [
+  {id:'body',icon:'💪',name:'BODY',color:'var(--peach)',thr:2,quests:[
+    {id:'w_w1',t:'Тренировка (силовая или кардио)',xp:50},
+    {id:'w_w2',t:'Вторая тренировка',xp:50},
+    {id:'w_w3',t:'Третья тренировка',xp:50},
+    {id:'w_prot',t:'Белок ≥4 дней из 7',xp:30},
+  ]},
+  {id:'surgery',icon:'🔪',name:'SURGERY',color:'var(--sky)',thr:1,quests:[
+    {id:'w_slog',t:'Запись в Surgical Log',xp:60},
+    {id:'w_auto',t:'Попросила больше самостоятельности',xp:50},
+    {id:'w_case',t:'Разобрала клинический кейс / протокол',xp:30},
+  ]},
+  {id:'influence',icon:'🌍',name:'INFLUENCE',color:'var(--lav)',thr:1,quests:[
+    {id:'w_intl',t:'Поиск международных возможностей (30 мин)',xp:40},
+    {id:'w_cv',t:'Обновила CV / портфолио',xp:50},
+    {id:'w_post',t:'Пост в @dr.kaukenova',xp:35},
+    {id:'w_app',t:'Подала заявку на конференцию / программу',xp:80},
+    {id:'w_ngo',t:'Действие по Medsupportkz / AWS',xp:50},
+  ]},
+  {id:'money',icon:'💰',name:'MONEY',color:'var(--mint)',thr:1,quests:[
+    {id:'w_ma',t:'Одно конкретное действие к +200k KZT',xp:60},
+    {id:'w_mt',t:'Учёт расходов / доходов недели',xp:20},
+    {id:'w_mi',t:'Записала и оценила 1 новую идею дохода',xp:30},
+  ]},
+  {id:'marriage',icon:'🌸',name:'MARRIAGE',color:'var(--pink)',thr:1,quests:[
+    {id:'w_md',t:'Качественный вечер с Алишером (без телефона)',xp:60},
+    {id:'w_mp',t:'Совместное планирование недели / выходных',xp:30},
+    {id:'w_mg',t:'Сказала что-то тёплое / благодарность',xp:20},
+    {id:'w_mf',t:'Физическая близость / нежность',xp:30},
+  ]},
+];
+var SPECS = [
+  {id:'gen',icon:'🔧',name:'Общая хирургия',procs:['Аппендэктомия (лапароскопия)','Аппендэктомия (открытая)','Холецистэктомия (лапароскопия)','Холецистэктомия (открытая)','Грыжесечение пахового канала','Грыжесечение пупочной грыжи','Спленэктомия','Резекция тонкой кишки','Гастростомия','Лапаротомия диагностическая','Дренирование брюшной полости','Ушивание перфорации','Резекция желудка']},
+  {id:'pur',icon:'🩹',name:'Гнойная хирургия',procs:['Вскрытие абсцесса','Вскрытие флегмоны','Некрэктомия','ПХО раны','Вскрытие панариция','Вскрытие паропроктита','Обработка трофической язвы','Дренирование гнойника','Иссечение свища','Ампутация пальца']},
+  {id:'col',icon:'🔵',name:'Колопроктология',procs:['Геморроидэктомия','Иссечение анальной трещины','Иссечение свища прямой кишки','Резекция сигмовидной кишки','Правосторонняя гемиколэктомия','Левосторонняя гемиколэктомия','Передняя резекция прямой кишки','БПЭ прямой кишки','Операция Гартмана','Наложение колостомы','Закрытие колостомы','Удаление полипа','Сфинктеропластика']},
+  {id:'mam',icon:'🎗',name:'Онкомаммология',procs:['Секторальная резекция','Мастэктомия по Маддену','Мастэктомия радикальная','Онкопластическая резекция','Биопсия сторожевого лимфоузла','Лимфодиссекция подмышечная','Удаление фиброаденомы','Энуклеация кисты','Установка порт-системы','Биопсия опухоли','Эксцизионная биопсия лимфоузла']},
+];
+var ROLES = [
+  {l:'Наблюдала',d:'только присутствовала',s:0},
+  {l:'Ассистировала пассивно',d:'крючки, инструменты',s:1},
+  {l:'Ассистировала активно',d:'коагуляция, клипирование',s:2},
+  {l:'Выполнила один этап',d:'конкретный шаг',s:3},
+  {l:'Вела часть операции',d:'несколько этапов под супервизией',s:4},
+  {l:'Первый оператор',d:'провела под супервизией',s:5},
+];
+var SKILL_TAGS = ['Вязание узлов','Работа с коагулятором','Троакарная техника','Выделение структур','Скорость работы','Пространственная ориентация','Гемостаз','Ушивание','Лапароскопическое мышление','Работа в глубине раны'];
+var MONEY_ACTIONS = ['Грант / заявка','Платное выступление','Экспертный комментарий','Цифровой продукт','Консультация / менторство','Партнёрство NGO','Курс / гайд','Медиа-коллаборация','Донор / спонсор'];
+var QB = [
+  {q:'Q2',name:'Burnout / Chaos',period:'18 мая — 30 июня 2026',cls:'qb-q2',note:'Цель Q2: создать базу. Не результат — системы.',
+   conds:['Белок + движение ≥4 дн/нед, 3 недели подряд','Список из 10 международных возможностей','Money map: возможные источники +200k KZT/мес','≥1 relationship block в неделю','Surgical log запущен (≥1 запись)']},
+  {q:'Q3',name:'Visibility',period:'1 июля — 30 сентября 2026',cls:'qb-q3',note:'Цель Q3: стать видимой. Хотя бы 1 внешний результат.',
+   conds:['≥3 международных заявок подано','Профиль: Kazakhstan health advocate / surgeon / NGO','Association of Women Surgeons KZ запущена','≥2 policy/media материала опубликованы','Вес снизился на 3–4 кг']},
+  {q:'Q4',name:'Credibility',period:'1 октября — 31 декабря 2026',cls:'qb-q4',note:'Цель Q4: один реальный внешний результат.',
+   conds:['1 международная поездка / грант ИЛИ 6–8 сильных заявок','+200k KZT/мес дополнительно 2 месяца подряд','−7 кг ИЛИ видимый рельеф','Брак ощущается как опора и команда','Портфолио: NGO · media · хирургия · исследования']},
+];
+var FROZEN = [
+  {name:'Book Writing',until:'2027',desc:'Написание медицинской книги'},
+  {name:'Fellowship (отд. домен)',until:'2027',desc:'Входит в Influence как инструмент'},
+  {name:'Teaching Domain',until:'2027',desc:'Преподавание как самостоятельное направление'},
+];
+var ISUBS = [
+  {icon:'📢',name:'Instagram / медиа',desc:'@dr.kaukenova — посты как инструмент видимости'},
+  {icon:'🏛',name:'NGO / Medsupportkz',desc:'Проекты NGO как строчки в международном CV'},
+  {icon:'📋',name:'Policy / медицинская политика',desc:'Open Parliament — экспертная позиция'},
+  {icon:'🔬',name:'Исследования / публикации',desc:'Научные статьи для конференций и fellowship'},
+  {icon:'👩‍⚕️',name:'Association of Women Surgeons KZ',desc:'Флагманский проект Q3 — публичный запуск'},
+];
+var MONTHS = ['Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+// ══════════════════════════════════════════════
+// TAB SWITCH
+// ══════════════════════════════════════════════
+function tab(id) {
+  var ids = ['today','weekly','surgery','money','sunday','monthly','bosses','frozen'];
+  document.querySelectorAll('.tab').forEach(function(t,i){ t.classList.toggle('active',ids[i]===id); });
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById('page-'+id).classList.add('active');
+  if (id==='sunday') renderSunday();
+  if (id==='monthly') renderMonthly();
+}
+
+// ══════════════════════════════════════════════
+// RENDER ALL
+// ══════════════════════════════════════════════
+function renderAll() {
+  document.getElementById('daysLeft').textContent = daysLeft();
+  renderWins(); renderWeekly(); renderSurgeryForm();
+  renderMoneyPage(); renderBosses(); renderFrozen();
+  renderMonthSel(); updateXP(); renderDateNav();
+}
+
+// ══════════════════════════════════════════════
+// DATE NAVIGATION
+// ══════════════════════════════════════════════
+function renderDateNav() {
+  var months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  var days = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+  var isT = isViewToday();
+  var dm = document.getElementById('dateMain');
+  var ds = document.getElementById('dateSub');
+  var nb = document.getElementById('nextBtn');
+  if (dm) dm.textContent = isT ? 'Сегодня' : viewDate.getDate()+' '+months[viewDate.getMonth()];
+  if (ds) ds.textContent = days[viewDate.getDay()] + (isT ? ' · '+viewDate.getDate()+' '+months[viewDate.getMonth()] : '');
+  if (nb) nb.disabled = isT;
+}
+
+function shiftDay(delta) {
+  var d = new Date(viewDate);
+  d.setDate(d.getDate()+delta);
+  var today = new Date(); today.setHours(0,0,0,0);
+  if (d > today) return;
+  viewDate = d;
+  renderDateNav();
+  var key = dateKey(viewDate);
+  if (DAYS[key] !== undefined) {
+    renderDay(key);
+  } else {
+    var lsD = lsGet('brpg_d_'+key);
+    DAYS[key] = lsD || {};
+    if (db) {
+      db.ref(ROOT+'/days/'+key).once('value', function(snap) {
+        DAYS[key] = Object.assign(DAYS[key], snap.val()||{});
+        lsSet('brpg_d_'+key, DAYS[key]);
+        renderDay(key);
+      });
+    } else {
+      renderDay(key);
+    }
+  }
+}
+
+// ══════════════════════════════════════════════
+// RENDER DAY
+// ══════════════════════════════════════════════
+function renderDay(key) {
+  var day = DAYS[key] || {};
+  var isToday = (key === todayKey());
+  var dailyDone = day.dailyDone || {};
+  var morningScore = day.morningScore || null;
+  var logged = !!day.logged;
+
+  // Morning
+  var mbtns = document.getElementById('morningBtns');
+  if (mbtns) {
+    mbtns.innerHTML = MORNING.map(function(o) {
+      var sel = morningScore===o.v ? ' sel' : '';
+      var dis = !isToday ? ' disabled' : '';
+      var click = isToday ? ' onclick="setMorning(\''+key+'\','+o.v+')"' : '';
+      return '<button class="mbtn'+sel+'"'+click+dis+'>'+o.e+'<span>'+o.l+'</span></button>';
+    }).join('');
+  }
+  var mbadge = document.getElementById('morningBadge');
+  if (mbadge) mbadge.style.display = morningScore ? 'flex' : 'none';
+  var rbox = document.getElementById('recBox');
+  if (rbox) {
+    if (morningScore && MREC[morningScore]) {
+      var rec = MREC[morningScore];
+      document.getElementById('recMode').textContent = rec.mode;
+      document.getElementById('recMode').style.color = rec.color;
+      document.getElementById('recPhrase').textContent = rec.phrase;
+      rbox.style.display = 'block';
+    } else {
+      rbox.style.display = 'none';
+    }
+  }
+
+  // Daily quests
+  var dql = document.getElementById('dqList');
+  if (dql) {
+    dql.innerHTML = DQ.map(function(q) {
+      var done = !!dailyDone[q.id];
+      var cls = 'dq'+(done?' done':'')+((!isToday)?' past':'');
+      var click = isToday ? ' onclick="toggleDQ(\''+key+'\',\''+q.id+'\','+q.xp+')"' : '';
+      return '<div class="'+cls+'" style="--qc:'+q.color+'"'+click+'>'
+        +'<div class="dqcheck">'+(done?'✓':'')+'</div>'
+        +'<div><div class="dqname">'+q.name+'</div><div class="dqmeta">'+q.meta+'</div></div>'
+        +'<div class="dqxp">+'+q.xp+'</div></div>';
+    }).join('');
+  }
+
+  // Today XP
+  var todayXP = DQ.filter(function(q){ return !!dailyDone[q.id]; }).reduce(function(s,q){ return s+q.xp; },0);
+  var txp = document.getElementById('todayXPVal');
+  if (txp) txp.textContent = todayXP;
+
+  // Evening
+  var hint = document.getElementById('eveningSub');
+  var form = document.getElementById('eveningForm');
+  var badge = document.getElementById('eveningBadge');
+  var shield = document.getElementById('shieldNote');
+
+  if (!isToday) {
+    if (form) form.style.display = 'none';
+    if (shield) shield.style.display = 'none';
+    if (badge) badge.style.display = logged ? 'flex' : 'none';
+    if (hint) { hint.textContent = logged ? '' : 'День не залогирован'; hint.style.display = logged ? 'none' : 'block'; }
+    return;
+  }
+
+  if (badge) badge.style.display = logged ? 'flex' : 'none';
+  if (logged) {
+    if (form) form.style.display = 'none';
+    if (hint) hint.style.display = 'none';
+    if (shield) shield.style.display = 'none';
+    return;
+  }
+
+  var anyDone = Object.values(dailyDone).some(Boolean);
+  var ms = morningScore || 3;
+  var isProtected = ms <= 2;
+  if (shield) shield.style.display = isProtected ? 'flex' : 'none';
+
+  if (anyDone || isProtected) {
+    if (hint) { hint.textContent = ''; hint.style.display = 'none'; }
+    if (form) {
+      form.style.display = 'block';
+      var vb = document.getElementById('vitBtns');
+      if (vb) vb.innerHTML = [0,1,2,3,4,5].map(function(n){
+        return '<button class="vbtn'+(day.vitality===n?' sel':'')+'" onclick="setVit(\''+key+'\','+n+')">'+n+'</button>';
+      }).join('');
+      var mb2 = document.getElementById('moodBtns');
+      if (mb2) mb2.innerHTML = MOODS.map(function(m,i){
+        return '<button class="mdbtn'+(day.mood===i?' sel':'')+'" onclick="setMood(\''+key+'\','+i+')">'+m+'</button>';
+      }).join('');
+    }
+  } else {
+    if (hint) { hint.textContent = 'Выполни хотя бы 1 квест чтобы разблокировать'; hint.style.display = 'block'; }
+    if (form) form.style.display = 'none';
+    if (shield) shield.style.display = 'none';
+  }
+}
+
+// ══════════════════════════════════════════════
+// DAY ACTIONS
+// ══════════════════════════════════════════════
+function setMorning(key, v) {
+  DAYS[key] = DAYS[key] || {};
+  DAYS[key].morningScore = v;
+  saveDay(key, {morningScore:v});
+  renderDay(key);
+}
+
+function toggleDQ(key, id, xp) {
+  DAYS[key] = DAYS[key] || {};
+  var done = DAYS[key].dailyDone || {};
+  var was = !!done[id];
+  done[id] = !was;
+  DAYS[key].dailyDone = done;
+  G.totalXP = (G.totalXP||0) + (was?-xp:xp);
+  G.weekXP = (G.weekXP||0) + (was?-xp:xp);
+  saveDay(key, {dailyDone:done});
+  saveG({totalXP:G.totalXP, weekXP:G.weekXP});
+  renderDay(key); updateXP();
+}
+
+function setVit(key, n) {
+  DAYS[key] = DAYS[key] || {};
+  DAYS[key].vitality = n;
+  saveDay(key, {vitality:n});
+  document.querySelectorAll('#vitBtns .vbtn').forEach(function(b,i){ b.classList.toggle('sel',i===n); });
+}
+
+function setMood(key, i) {
+  DAYS[key] = DAYS[key] || {};
+  DAYS[key].mood = i;
+  saveDay(key, {mood:i});
+  document.querySelectorAll('.mdbtn').forEach(function(b,j){ b.classList.toggle('sel',j===i); });
+}
+
+function logDay() {
+  var key = todayKey();
+  var day = DAYS[key] || {};
+  var note = (document.getElementById('dayNote')||{}).value || '';
+  var todayStr = new Date().toDateString();
+  var yest = new Date(Date.now()-86400000).toDateString();
+  if (G.lastStreakDay === yest) G.streak = (G.streak||0)+1;
+  else if (G.lastStreakDay !== todayStr) G.streak = 1;
+  G.lastStreakDay = todayStr;
+  G.totalXP = (G.totalXP||0)+50;
+  G.weekXP = (G.weekXP||0)+50;
+  day.logged = true; day.note = note;
+  DAYS[key] = day;
+  saveDay(key, {logged:true, note:note});
+  saveG({streak:G.streak, lastStreakDay:G.lastStreakDay, totalXP:G.totalXP, weekXP:G.weekXP});
+  renderDay(key); updateXP();
+}
+
+// ══════════════════════════════════════════════
+// WIN CONDITIONS
+// ══════════════════════════════════════════════
+function renderWins() {
+  var el = document.getElementById('winsGrid'); if (!el) return;
+  el.innerHTML = WINS.map(function(w){
+    return '<div class="wcard" style="--wc:'+w.color+'"><div class="wicon">'+w.icon+'</div><div class="wname">'+w.name+'</div><div class="wgoal">'+w.goal+'</div></div>';
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// WEEKLY
+// ══════════════════════════════════════════════
+function renderWeekly() {
+  var el = document.getElementById('weeklyDomains'); if (!el) return;
+  el.innerHTML = WD.map(function(d){
+    var done = d.quests.filter(function(q){ return !!(G.sqDone||{})[q.id]; }).length;
+    var pct = Math.round(done/d.quests.length*100);
+    var win = done >= d.thr;
+    return '<div class="domain-card">'
+      +'<div class="dc-header"><div class="dc-title"><span class="dc-icon">'+d.icon+'</span><span class="dc-name" style="color:'+d.color+'">'+d.name+'</span></div>'
+      +'<div class="dc-right"><div class="dc-bar"><div class="dc-fill" style="width:'+pct+'%;background:'+d.color+'"></div></div>'
+      +'<span class="dc-pct">'+done+'/'+d.quests.length+'</span>'
+      +'<span class="dc-win '+(win?'achieved':'pending')+'">'+(win?'✓ WIN':'pending')+'</span></div></div>'
+      +'<div class="sq-list">'+d.quests.map(function(q){
+        var qd = !!(G.sqDone||{})[q.id];
+        return '<div class="sq'+(qd?' done':'')+'" style="--sqc:'+d.color+'" onclick="toggleSQ(\''+q.id+'\','+q.xp+')">'
+          +'<div class="sqcheck" style="border-color:'+d.color+'">'+(qd?'✓':'')+'</div>'
+          +'<span class="sq-text">'+q.t+'</span><span class="sq-xp">+'+q.xp+'</span></div>';
+      }).join('')+'</div></div>';
+  }).join('');
+}
+
+function toggleSQ(id, xp) {
+  G.sqDone = G.sqDone || {};
+  var was = !!G.sqDone[id];
+  G.sqDone[id] = !was;
+  G.totalXP = (G.totalXP||0)+(was?-xp:xp);
+  G.weekXP = (G.weekXP||0)+(was?-xp:xp);
+  saveG({sqDone:G.sqDone, totalXP:G.totalXP, weekXP:G.weekXP});
+  renderWeekly(); updateXP();
+}
+
+// ══════════════════════════════════════════════
+// SURGERY LOG
+// ══════════════════════════════════════════════
+function renderSurgeryForm() {
+  var sg = document.getElementById('specGrid'); if (!sg) return;
+  sg.innerHTML = '';
+  SPECS.forEach(function(s) {
+    var btn = document.createElement('button');
+    btn.className = 'spec-btn'+(SL.specialty===s.id?' sel':'');
+    btn.innerHTML = '<span class="si">'+s.icon+'</span>'+s.name;
+    btn.addEventListener('click', function(){ selSpec(s.id); });
+    sg.appendChild(btn);
+  });
+  renderSlogList();
+}
+
+function selSpec(id) {
+  SL.specialty = id; SL.proc = null;
+  document.getElementById('procRow').style.display = 'block';
+  document.getElementById('roleRow').style.display = 'none';
+  document.getElementById('detailRow').style.display = 'none';
+  document.querySelectorAll('.spec-btn').forEach(function(b,i){ b.classList.toggle('sel', SPECS[i].id===id); });
+  var spec = SPECS.find(function(s){ return s.id===id; });
+  var freq = getFreqProcs();
+  var pg = document.getElementById('procGrid');
+  if (pg && spec) pg.innerHTML = spec.procs.map(function(p){
+    var isFreq = freq.indexOf(p)>=0;
+    return '<button class="proc-btn'+(SL.proc===p?' sel':'')+(isFreq?' freq':'')+'" onclick="selProc(\''+p.replace(/'/g,"\\'")+'\')">'+(isFreq?'★ ':'')+p+'</button>';
+  }).join('');
+}
+
+function selProc(p) {
+  SL.proc = p;
+  document.querySelectorAll('.proc-btn').forEach(function(b){ b.classList.toggle('sel', b.textContent.replace('★ ','').trim()===SL.proc); });
+  document.getElementById('roleRow').style.display = 'block';
+  var rg = document.getElementById('roleGrid');
+  if (rg) rg.innerHTML = ROLES.map(function(r){
+    return '<button class="role-btn'+(SL.role===r.l?' sel':'')+'" onclick="selRole(\''+r.l.replace(/'/g,"\\'")+'\',' +r.s+')">'
+      +'<span>'+r.l+' <span style="color:var(--muted);font-weight:400">— '+r.d+'</span></span>'
+      +'<span class="role-score">'+r.s+'/5</span></button>';
+  }).join('');
+}
+
+function addCustomProc() {
+  var inp = document.getElementById('customProc');
+  if (inp && inp.value.trim()) { selProc(inp.value.trim()); inp.value=''; }
+}
+
+function selRole(label, score) {
+  SL.role = label; SL.score = score;
+  document.querySelectorAll('.role-btn').forEach(function(b){ b.classList.toggle('sel', b.textContent.startsWith(label)); });
+  document.getElementById('detailRow').style.display = 'block';
+  var ab = document.getElementById('autoBtns');
+  if (ab) ab.innerHTML = ['0 набл.','1 пассив','2 актив','3 этап','4 часть','5 первый оп.'].map(function(l,n){
+    return '<button class="abtn'+(SL.score===n?' sel':'')+'" onclick="selAuto('+n+')">'+l+'</button>';
+  }).join('');
+  var tr = document.getElementById('tagRow');
+  if (tr) tr.innerHTML = SKILL_TAGS.map(function(t){
+    return '<button class="tag'+(SL.tags.indexOf(t)>=0?' sel':'')+'" onclick="togTag(\''+t.replace(/'/g,"\\'")+'\')">' +t+'</button>';
+  }).join('');
+}
+
+function selAuto(n) {
+  SL.score = n;
+  document.querySelectorAll('.abtn').forEach(function(b,i){ b.classList.toggle('sel',i===n); });
+  var matchRole = ROLES.find(function(r){ return r.s===n; });
+  if (matchRole) { SL.role = matchRole.l; document.querySelectorAll('.role-btn').forEach(function(b){ b.classList.toggle('sel',b.textContent.startsWith(matchRole.l)); }); }
+}
+
+function togTag(t) {
+  var i = SL.tags.indexOf(t);
+  if (i>=0) SL.tags.splice(i,1); else SL.tags.push(t);
+  document.querySelectorAll('.tag').forEach(function(b){ b.classList.toggle('sel', SL.tags.indexOf(b.textContent)>=0); });
+}
+
+function getFreqProcs() {
+  var counts = {};
+  (G.slogEntries||[]).forEach(function(e){ if (e.proc) counts[e.proc]=(counts[e.proc]||0)+1; });
+  return Object.keys(counts).filter(function(k){ return counts[k]>=2; });
+}
+
+function saveLog() {
+  if (!SL.proc) { alert('Выбери операцию'); return; }
+  var tags = SL.tags.join(', ');
+  var note = (document.getElementById('improvedNote')||{}).value||'';
+  var improved = [tags,note].filter(Boolean).join(' · ');
+  var next = (document.getElementById('nextQ')||{}).value||'';
+  var spec = SPECS.find(function(s){ return s.id===SL.specialty; });
+  var entry = {proc:SL.proc, specialty:spec?spec.name:'', role:SL.role||'', improved:improved, next:next, score:SL.score, date:new Date().toLocaleDateString('ru'), ts:Date.now()};
+  G.slogEntries = G.slogEntries||[];
+  G.slogEntries.unshift(entry);
+  G.totalXP = (G.totalXP||0)+120; G.weekXP = (G.weekXP||0)+120;
+  G.sqDone = G.sqDone||{}; G.sqDone['w_slog'] = true;
+  saveG({totalXP:G.totalXP, weekXP:G.weekXP, sqDone:G.sqDone, slogEntries:G.slogEntries});
+  if (db) try { db.ref(ROOT+'/global/slogEntries').set(G.slogEntries); } catch(e){}
+  SL = {specialty:null,proc:null,role:null,score:null,tags:[]};
+  ['customProc','improvedNote','nextQ'].forEach(function(id){ var el=document.getElementById(id); if (el) el.value=''; });
+  ['procRow','roleRow','detailRow'].forEach(function(id){ var el=document.getElementById(id); if (el) el.style.display='none'; });
+  renderSurgeryForm(); renderWeekly(); updateXP();
+}
+
+function renderSlogList() {
+  var el = document.getElementById('slogList'); if (!el) return;
+  var entries = G.slogEntries||[];
+  if (!entries.length) { el.innerHTML='<div class="note">Нет записей.</div>'; return; }
+  el.innerHTML = entries.map(function(e){
+    return '<div class="sentry"><div class="emeta"><span class="eproc">'+e.proc+'</span><span class="escore">автономия '+(e.score!=null?e.score:'—')+'/5</span></div>'
+      +(e.specialty?'<div style="font-size:7px;color:var(--sky);margin-bottom:3px">'+e.specialty+'</div>':'')
+      +'<div><b>Роль:</b> '+(e.role||'—')+'</div><div><b>Улучшилось:</b> '+(e.improved||'—')+'</div>'
+      +'<div><b>Следующий вопрос:</b> '+(e.next||'—')+'</div>'
+      +'<div style="font-size:7px;color:var(--muted);margin-top:3px">'+e.date+(e.synced?' · ✓ synced':'')+'</div></div>';
+  }).join('');
+}
+
+function syncSheets() {
+  var btn = document.getElementById('sheetsBtn');
+  var entries = (G.slogEntries||[]).filter(function(e){ return !e.synced; });
+  if (!entries.length) { btn.textContent='✓ ALL SYNCED'; btn.className='sheets-btn ok'; setTimeout(function(){ btn.textContent='📊 SYNC TO SHEETS'; btn.className='sheets-btn'; },2000); return; }
+  btn.textContent='⏳ SYNCING...'; btn.className='sheets-btn syncing';
+  var ok = 0;
+  function next(i) {
+    if (i>=entries.length) {
+      if (ok>0) { saveG({slogEntries:G.slogEntries}); if (db) try{db.ref(ROOT+'/global/slogEntries').set(G.slogEntries);}catch(e){} btn.textContent='✓ '+ok+' SYNCED'; btn.className='sheets-btn ok'; }
+      else { btn.textContent='✗ ERROR'; btn.className='sheets-btn'; }
+      setTimeout(function(){ btn.textContent='📊 SYNC TO SHEETS'; btn.className='sheets-btn'; renderSlogList(); },3000);
+      return;
+    }
+    var entry = entries[i];
+    var iframe = document.createElement('iframe');
+    iframe.name='sf_'+Date.now(); iframe.style.display='none'; document.body.appendChild(iframe);
+    var form = document.createElement('form');
+    form.method='POST'; form.action=SHEETS_URL; form.target=iframe.name; form.style.display='none';
+    var field = document.createElement('input'); field.type='hidden'; field.name='payload';
+    field.value=JSON.stringify({date:entry.date||'',proc:entry.proc||'',role:entry.role||'',improved:entry.improved||'',next:entry.next||'',score:entry.score!=null?entry.score:''});
+    form.appendChild(field); document.body.appendChild(form);
+    var done=false;
+    function finish(){ if(done)return; done=true; try{document.body.removeChild(form);document.body.removeChild(iframe);}catch(e){} entry.synced=true; ok++; next(i+1); }
+    iframe.onload=finish; setTimeout(finish,5000); form.submit();
+  }
+  next(0);
+}
+
+// ══════════════════════════════════════════════
+// MONEY
+// ══════════════════════════════════════════════
+function renderMoneyPage() {
+  var pct = Math.min(100, Math.round((G.moneyCurrent||0)/200000*100));
+  var mb = document.getElementById('moneyBar'); if (mb) mb.style.width=pct+'%';
+  var ml = document.getElementById('moneyLbl'); if (ml) ml.textContent=(G.moneyCurrent||0).toLocaleString('ru')+' KZT/мес';
+  var ag = document.getElementById('actionGrid');
+  if (ag) ag.innerHTML = MONEY_ACTIONS.map(function(a){
+    return '<button class="actbtn'+(G.moneyAction===a?' sel':'')+'" onclick="selAction(\''+a.replace(/'/g,"\\'")+'\')">'+(a)+'</button>';
+  }).join('');
+  var logEl = document.getElementById('moneyLog');
+  if (logEl) {
+    var log = G.moneyLog||[];
+    logEl.innerHTML = log.length ? log.slice(0,10).map(function(e){
+      return '<div class="mentry"><span class="metype">'+e.type+'</span><span class="medate">'+e.date+'</span></div>';
+    }).join('') : '<div class="note">Нет записей.</div>';
+  }
+  var conds = ['4 money-действия выполнены в этом месяце','1 конкретный оффер / заявка / сообщение отправлено'];
+  var bc = document.getElementById('mbossConds');
+  if (bc) bc.innerHTML = conds.map(function(c,i){
+    var d = !!(G.moneyBossDone||{})[i];
+    return '<div class="bc'+(d?' done':'')+'" onclick="togMoneyBoss('+i+')">'+'<div class="bc-box">'+(d?'✓':'')+'</div><span class="bc-txt">'+c+'</span></div>';
+  }).join('');
+  var bh = document.getElementById('mbossHP');
+  if (bh) { var done=Object.values(G.moneyBossDone||{}).filter(Boolean).length; bh.style.width=(100-done*50)+'%'; }
+}
+
+function setMoney() { var v=parseInt(document.getElementById('moneyInput').value)||0; saveG({moneyCurrent:v}); renderMoneyPage(); }
+function selAction(a) { saveG({moneyAction:a}); renderMoneyPage(); }
+function logAction() {
+  if (!G.moneyAction) { alert('Выбери тип действия'); return; }
+  G.moneyLog = G.moneyLog||[];
+  G.moneyLog.unshift({type:G.moneyAction, date:new Date().toLocaleDateString('ru')});
+  G.totalXP=(G.totalXP||0)+160; G.weekXP=(G.weekXP||0)+160;
+  saveG({moneyLog:G.moneyLog, totalXP:G.totalXP, weekXP:G.weekXP, moneyAction:null});
+  renderMoneyPage(); updateXP();
+}
+function togMoneyBoss(i) { G.moneyBossDone=G.moneyBossDone||{}; G.moneyBossDone[i]=!G.moneyBossDone[i]; saveG({moneyBossDone:G.moneyBossDone}); renderMoneyPage(); }
+
+// ══════════════════════════════════════════════
+// SUNDAY REVIEW
+// ══════════════════════════════════════════════
+function renderSunday() {
+  var sr = document.getElementById('sr-xp'); if (sr) sr.textContent=G.weekXP||0;
+  var todayDone = Object.values((DAYS[todayKey()]||{}).dailyDone||{}).filter(Boolean).length;
+  var sd = document.getElementById('sr-daily'); if (sd) sd.textContent=todayDone+'/'+DQ.length;
+  var wins = WD.filter(function(d){ return d.quests.filter(function(q){ return !!(G.sqDone||{})[q.id]; }).length>=d.thr; }).length;
+  var sdom = document.getElementById('sr-domains'); if (sdom) sdom.textContent=wins+'/'+WD.length;
+  var dl = document.getElementById('sr-domains-list');
+  if (dl) dl.innerHTML = WD.map(function(d){
+    var done=d.quests.filter(function(q){ return !!(G.sqDone||{})[q.id]; }).length;
+    var win=done>=d.thr;
+    return '<div class="dwin'+(win?' ok':'')+'"><div class="dwin-dot"></div><span>'+d.icon+' '+d.name+' — '+done+'/'+d.quests.length+(win?' ✓':'')+'</span></div>';
+  }).join('');
+  var tb = document.getElementById('tempBtns');
+  if (tb) tb.innerHTML=[0,1,2,3,4,5].map(function(n){
+    return '<button class="tbtn'+(G.tempScore===n?' sel':'')+'" onclick="setTemp('+n+')">'+n+'</button>';
+  }).join('');
+  var td = document.getElementById('tempDesc'); if (td) td.textContent=G.tempScore!=null?TDESC[G.tempScore]:'Выбери температуру недели';
+  var th = document.getElementById('tempHist');
+  if (th) th.innerHTML=(G.tempHistory||[]).slice(-8).map(function(v){
+    return '<div class="tbar" style="height:'+Math.max(4,v/5*42)+'px;flex:1" title="'+v+'/5"></div>';
+  }).join('');
+  var sv = document.getElementById('sr-vit');
+  if (sv) sv.innerHTML=[0,1,2,3,4,5].map(function(n){
+    return '<button class="vbtn'+(G.srVit===n?' sel':'')+'" onclick="setSRVit('+n+')">'+n+'</button>';
+  }).join('');
+}
+
+function setTemp(n) { saveG({tempScore:n}); document.querySelectorAll('#tempBtns .tbtn').forEach(function(b,i){ b.classList.toggle('sel',i===n); }); document.getElementById('tempDesc').textContent=TDESC[n]; }
+function setSRVit(n) { saveG({srVit:n}); document.querySelectorAll('#sr-vit .vbtn').forEach(function(b,i){ b.classList.toggle('sel',i===n); }); }
+
+function closeWeek() {
+  if (G.tempScore==null) { alert('Поставь температуру недели'); return; }
+  G.tempHistory = G.tempHistory||[];
+  G.tempHistory.push(G.tempScore);
+  G.monthlySnaps = G.monthlySnaps||{};
+  var mk='m'+new Date().getMonth();
+  G.monthlySnaps[mk] = G.monthlySnaps[mk]||[];
+  G.monthlySnaps[mk].push({date:new Date().toLocaleDateString('ru'), weekXP:G.weekXP||0, temp:G.tempScore, domainWins:WD.filter(function(d){ return d.quests.filter(function(q){ return !!(G.sqDone||{})[q.id]; }).length>=d.thr; }).length, month:new Date().getMonth()});
+  saveG({tempHistory:G.tempHistory, monthlySnaps:G.monthlySnaps, weekXP:0, sqDone:{}, tempScore:null, srVit:null});
+  alert('✦ Неделя закрыта! Начинаем следующую.');
+  renderAll(); renderDay(todayKey());
+}
+
+// ══════════════════════════════════════════════
+// MONTHLY
+// ══════════════════════════════════════════════
+var selMonth = new Date().getMonth();
+function renderMonthSel() {
+  var el = document.getElementById('monthSel'); if (!el) return;
+  el.innerHTML = MONTHS.map(function(m,i){
+    var mi=i+4;
+    return '<button class="msel-btn'+(selMonth===mi?' active':'')+'" onclick="pickMonth('+mi+')">'+m+'</button>';
+  }).join('');
+}
+function pickMonth(m) { selMonth=m; renderMonthSel(); renderMonthly(); }
+function renderMonthly() {
+  var el=document.getElementById('monthReport'); if (!el) return;
+  var mk='m'+selMonth;
+  var snaps=((G.monthlySnaps||{})[mk])||[];
+  var mname=MONTHS[selMonth-4]||'—';
+  var totalXP=snaps.reduce(function(s,w){ return s+w.weekXP; },0);
+  var avgTemp=snaps.length?(snaps.reduce(function(s,w){ return s+w.temp; },0)/snaps.length).toFixed(1):'—';
+  var slogM=(G.slogEntries||[]).filter(function(e){ return new Date(e.ts).getMonth()===selMonth; }).length;
+  var moneyM=(G.moneyLog||[]).filter(function(e){ try{ var p=e.date.split('.'); return new Date(+p[2],+p[1]-1,+p[0]).getMonth()===selMonth; }catch(x){ return false; } }).length;
+  if (!snaps.length&&selMonth===new Date().getMonth()) {
+    el.innerHTML='<div class="report-card"><b>'+mname+' 2026</b><div class="note" style="margin-top:8px">Данные появятся после первого Sunday Review этого месяца.</div></div>';
+    return;
+  }
+  el.innerHTML='<div class="report-card"><div style="font-family:Unbounded,sans-serif;font-size:13px;font-weight:700;margin-bottom:3px">'+mname+' 2026</div>'
+    +'<div class="note" style="margin-bottom:12px">'+snaps.length+' недель</div>'
+    +'<div class="report-grid">'
+    +'<div class="rstat"><div class="rval" style="color:var(--pink)">'+totalXP+'</div><div class="rlbl">XP МЕСЯЦ</div></div>'
+    +'<div class="rstat"><div class="rval" style="color:var(--pink)">'+avgTemp+'</div><div class="rlbl">ТЕМП. БРАКА</div></div>'
+    +'<div class="rstat"><div class="rval" style="color:var(--sky)">'+slogM+'</div><div class="rlbl">SURGERY LOGS</div></div>'
+    +'<div class="rstat"><div class="rval" style="color:var(--mint)">'+moneyM+'</div><div class="rlbl">MONEY ACTIONS</div></div>'
+    +'</div>'
+    +snaps.map(function(w){ return '<div class="mentry"><span class="metype">'+w.date+'</span><span>'+w.weekXP+' XP · темп '+w.temp+'/5 · '+w.domainWins+' доменов</span></div>'; }).join('')
+    +'</div>';
+}
+
+// ══════════════════════════════════════════════
+// BOSSES
+// ══════════════════════════════════════════════
+function renderBosses() {
+  var el=document.getElementById('qBosses'); if (!el) return;
+  el.innerHTML=QB.map(function(b){
+    var done=b.conds.filter(function(_,i){ return !!(G.kcDone||{})[b.q+'_'+i]; }).length;
+    var pct=Math.round(done/b.conds.length*100);
+    return '<div class="qb '+b.cls+'">'
+      +'<div class="qb-tag">'+b.q+' BOSS</div><div class="qb-name">'+b.name+'</div><div class="qb-period">'+b.period+'</div>'
+      +'<div class="qbhpbar"><div class="qbhpfill" style="width:'+(100-pct)+'%"></div></div>'
+      +'<div>'+b.conds.map(function(c,i){
+        var key=b.q+'_'+i; var d=!!(G.kcDone||{})[key];
+        return '<div class="kc'+(d?' done':'')+'" onclick="togKC(\''+key+'\')">'
+          +'<div class="kc-box">'+(d?'✓':'')+'</div><span class="kc-txt">'+c+'</span></div>';
+      }).join('')+'</div><div class="qb-note">'+b.note+'</div></div>';
+  }).join('');
+  updateYearBoss();
+}
+
+function togKC(key) { G.kcDone=G.kcDone||{}; G.kcDone[key]=!G.kcDone[key]; saveG({kcDone:G.kcDone}); renderBosses(); }
+function updateYearBoss() {
+  var total=QB.reduce(function(s,b){ return s+b.conds.length; },0);
+  var done=Object.values(G.kcDone||{}).filter(Boolean).length;
+  var hp=Math.max(0,Math.round((1-done/total)*100));
+  var yh=document.getElementById('ybHP'); if (yh) yh.style.width=hp+'%';
+  var yl=document.getElementById('ybHPlbl'); if (yl) yl.textContent=hp+' HP';
+}
+
+// ══════════════════════════════════════════════
+// FROZEN
+// ══════════════════════════════════════════════
+function renderFrozen() {
+  var fg=document.getElementById('frozenGrid');
+  if (fg) fg.innerHTML=FROZEN.map(function(f){ return '<div class="fcard"><div class="fname">❄ '+f.name+'</div><div class="funtil">→ '+f.until+'</div><div class="fdesc">'+f.desc+'</div></div>'; }).join('');
+  var is=document.getElementById('influenceSubs');
+  if (is) is.innerHTML=ISUBS.map(function(s){ return '<div class="isub"><div class="iicon">'+s.icon+'</div><div><div class="iname">'+s.name+'</div><div class="idesc">'+s.desc+'</div></div></div>'; }).join('');
+}
+
+// ══════════════════════════════════════════════
+// XP DISPLAY
+// ══════════════════════════════════════════════
+function updateXP() {
+  var xp=Math.max(0,G.totalXP||0);
+  var txp=document.getElementById('totalXP'); if (txp) txp.textContent=xp;
+  var pct=Math.min(100,Math.round(xp/8000*100));
+  var bar=document.getElementById('xpBar'); if (bar) bar.style.width=pct+'%';
+  var pp=document.getElementById('xpPct'); if (pp) pp.textContent=pct+'%';
+  var wk=document.getElementById('weekXPVal'); if (wk) wk.textContent=Math.max(0,G.weekXP||0);
+  var st=document.getElementById('streakVal'); if (st) st.textContent=G.streak||0;
+}
+
+// ══════════════════════════════════════════════
+// START
+// ══════════════════════════════════════════════
+boot();
+</script>
+</body>
+</html>
