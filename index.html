@@ -950,7 +950,17 @@ window.getDayState = function() {
   const key = window.getDateKey(window.viewDate);
   const todayKey = getTodayKey();
   if (key === todayKey) {
-    // Today — use live S state
+    // Check if lastStreakDay is from a previous day — if so, reset today's state
+    const last = window.S.lastStreakDay;
+    if (last && last !== new Date().toDateString()) {
+      window.S.todayLogged = false;
+      window.S.dailyDone = {};
+      window.S.morningScore = null;
+      window.S.todayMood = null;
+      if(window.saveToFirebase) window.saveToFirebase({
+        todayLogged: false, dailyDone: {}, morningScore: null, todayMood: null
+      });
+    }
     return {
       dailyDone: window.S.dailyDone || {},
       morningScore: window.S.morningScore,
